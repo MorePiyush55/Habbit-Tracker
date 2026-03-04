@@ -29,10 +29,9 @@ export const authOptions: NextAuthOptions = {
                             lastCompletedDate: "",
                         });
                     }
-                    return true;
                 } catch (error) {
-                    console.error("Error during sign in:", error);
-                    return false;
+                    console.error("Error during sign in (DB):", error);
+                    // Don't block sign-in if DB fails — user creation will retry later
                 }
             }
             return true;
