@@ -1,12 +1,23 @@
 import { getUserId } from "@/lib/auth";
 import { getTodayProgress, toggleSubtaskProgress } from "@/services/progressService";
+import { seedDefaultTasks } from "@/services/habitService";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import { toggleProgressSchema } from "@/lib/validation";
+import Habit from "@/models/Habit";
+import connectDB from "@/lib/mongodb";
 
 export async function GET(req: Request) {
     try {
         const userId = await getUserId();
         if (!userId) return unauthorized();
+
+        await connectDB();
+
+        // Ensure default tasks are seeded if the user has NO habits
+        const count = await Habit.countDocuments({ userId });
+        if (count === 0) {
+            await seedDefaultTasks(userId);
+        }
 
         const { searchParams } = new URL(req.url);
         const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
