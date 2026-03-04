@@ -1,18 +1,7 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getUserId } from "@/lib/auth";
 import { updateHabit, deleteHabit } from "@/services/habitService";
 import { handleError, unauthorized } from "@/lib/apiError";
-import connectDB from "@/lib/mongodb";
-import User from "@/models/User";
 import { NextRequest } from "next/server";
-
-async function getUserId() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    await connectDB();
-    const user = await User.findOne({ email: session.user.email });
-    return user?._id?.toString() || null;
-}
 
 export async function PUT(
     req: NextRequest,
