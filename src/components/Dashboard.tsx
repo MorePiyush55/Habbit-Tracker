@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
 import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
-import StreakDisplay from "@/components/game/StreakDisplay";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemChat from "@/components/system/SystemChat";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
-import { LogOut } from "lucide-react";
+import AppNav from "@/components/AppNav";
 
 interface Subtask {
     _id: string;
@@ -154,7 +154,8 @@ export default function Dashboard() {
     }
 
     return (
-        <>
+        <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
+            <AppNav />
             <SystemEventBanner />
             <div className="dashboard-grid">
                 {/* ── LEFT SIDEBAR ── */}
@@ -168,56 +169,49 @@ export default function Dashboard() {
                         disciplineScore={userStats.disciplineScore}
                         hunterRank={userStats.hunterRank}
                     />
-                    <StreakDisplay
-                        currentStreak={userStats.currentStreak}
-                        longestStreak={userStats.longestStreak}
-                    />
-                    <AchievementBadges unlockedIds={[]} />
 
-                    {/* Training & Debrief Actions */}
+                    {/* Weekly Boss Raid */}
+                    <BossBattle
+                        bossHP={userStats.weeklyBossHP}
+                        isDefeated={userStats.bossDefeatedThisWeek}
+                        currentStreak={userStats.currentStreak}
+                    />
+
+                    {/* Active Training — above achievements */}
                     <ActiveTrainingUI />
 
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => signOut()}
-                        style={{ width: "100%", opacity: 0.6, fontSize: "0.8rem" }}
-                        id="sign-out-btn"
-                    >
-                        <LogOut size={14} />
-                        Sign Out
-                    </button>
+                    <AchievementBadges unlockedIds={[]} />
                 </div>
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="main-content">
-                    {/* ROW 1: System Chat — full width */}
+                    {/* System Chat */}
                     <SystemChat />
 
-                    {/* ROW 2: Boss Battle (left) + Quests (right) */}
-                    <div className="boss-quest-row">
-                        <div className="boss-col">
-                            <BossBattle
-                                bossHP={userStats.weeklyBossHP}
-                                isDefeated={userStats.bossDefeatedThisWeek}
-                                currentStreak={userStats.currentStreak}
-                            />
-                        </div>
-                        <div className="quest-col">
-                            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-md)" }}>
-                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                                    + Add Daily Task
-                                </button>
+                    {/* Quest Summary + link to /tasks */}
+                    <div className="glass-card" style={{ padding: "var(--space-lg)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-md)" }}>
+                            <div className="section-title" style={{ margin: 0 }}>
+                                <span style={{ color: "var(--accent-blue)" }}>◈</span> Daily Quests
                             </div>
-                            <QuestPanel
-                                quests={quests}
-                                date={today}
-                                onToggleSubtask={handleToggleSubtask}
-                                loading={toggling}
-                            />
+                            <div style={{ display: "flex", gap: 8 }}>
+                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                                    + Add Quest
+                                </button>
+                                <Link href="/tasks" className="btn btn-secondary" style={{ textDecoration: "none" }}>
+                                    View All →
+                                </Link>
+                            </div>
                         </div>
+                        <QuestPanel
+                            quests={quests}
+                            date={today}
+                            onToggleSubtask={handleToggleSubtask}
+                            loading={toggling}
+                        />
                     </div>
 
-                    {/* ROW 3: Daily Strategy — full width */}
+                    {/* Daily Strategy */}
                     <DailyStrategyPanel />
                 </div>
 
@@ -227,6 +221,6 @@ export default function Dashboard() {
                     onQuestCreated={fetchProgress}
                 />
             </div>
-        </>
+        </div>
     );
 }

@@ -1,0 +1,197 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import QuestPanel from "@/components/game/QuestPanel";
+import CreateQuestModal from "@/components/game/CreateQuestModal";
+import AppNav from "@/components/AppNav";
+import { ListChecks, Loader2 } from "lucide-react";
+
+interface Subtask {
+    _id: string;
+    title: string;
+    order: number;
+    completed: boolean;
+    xpEarned: number;
+}
+
+interface Quest {
+    _id: string;
+    title: string;
+    category: string;
+    difficulty: string;
+    xpReward: number;
+    subtasks: Subtask[];
+    completionPercent: number;
+    isFullyCompleted: boolean;
+}
+
+export default function TasksPage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const [quests, setQuests] = useState<Quest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [toggling, setToggling] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Redirect to login if not authenticated
+    useEffect(() => {
+        if (status === "unauthenticated") router.push("/");
+    }, [status, router]);
+
+    const fetchQuests = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/progress?date=${today}`);
+            if (res.ok) {
+                const data = await res.json();
+                setQuests(data.habits || []);
+            }
+        } catch (err) {
+            console.error("Failed to fetch quests:", err);
+        }
+        setLoading(false);
+    }, [today]);
+
+    useEffect(() => {
+        fetchQuests();
+        const interval = setInterval(fetchQuests, 30000);
+        return () => clearInterval(interval);
+    }, [fetchQuests]);
+
+    const handleToggleSubtask = async (habitId: string, subtaskId: string, completed: boolean) => {
+        setToggling(true);
+        setQuests((prev) =>
+            prev.map((q) => {
+                if (q._id !== habitId) return q;
+                const updatedSubtasks = q.subtasks.map((s) =>
+                    s._id === subtaskId ? { ...s, completed } : s
+                );
+                const completedCount = updatedSubtasks.filter((s) => s.completed).length;
+                const totalCount = updatedSubtasks.length || 1;
+                return {
+                    ...q,
+                    subtasks: updatedSubtasks,
+                    completionPercent: Math.round((completedCount / totalCount) * 100),
+                    isFullyCompleted: completedCount === totalCount,
+                };
+            })
+        );
+
+        try {
+            const res = await fetch("/api/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ habitId, subtaskId, completed, date: today }),
+            });
+            if (res.ok) await fetchQuests();
+        } catch {
+            await fetchQuests();
+        }
+        setToggling(false);
+    };
+
+    const completedCount = quests.filter((q) => q.isFullyCompleted).length;
+    const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
+
+    if (status === "loading" || loading) {
+        return (
+            <div className="loading-spinner" style={{ minHeight: "100vh" }}>
+                <div className="spinner" />
+            </div>
+        );
+    }
+
+    if (!session) return null;
+
+    return (
+        <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
+            <AppNav />
+            <div className="tasks-page">
+                {/* Header */}
+                <div className="tasks-header glass-card">
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <ListChecks size={28} style={{ color: "var(--accent-blue)" }} />
+                        <div>
+                            <h1 style={{
+                                fontFamily: "var(--font-display)",
+                                fontSize: "1.5rem",
+                                fontWeight: 700,
+                                color: "var(--text-primary)",
+                                margin: 0,
+                                letterSpacing: 1
+                            }}>
+                                DAILY QUESTS
+                            </h1>
+                            <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "0.85rem" }}>
+                                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Stats row */}
+                    <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+                        <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-blue)" }}>
+                                {completedCount}/{quests.length}
+                            </div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMPLETED</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-gold)" }}>
+                                +{totalXP}
+                            </div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>XP TODAY</div>
+                        </div>
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => setIsCreateModalOpen(true)}
+                            style={{ marginLeft: "auto" }}
+                        >
+                            + Add Quest
+                        </button>
+                    </div>
+                </div>
+
+                {/* Overall progress bar */}
+                <div className="glass-card" style={{ padding: "16px 24px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", letterSpacing: 1 }}>DAILY COMPLETION</span>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent-blue)" }}>
+                            {quests.length > 0 ? Math.round((completedCount / quests.length) * 100) : 0}%
+                        </span>
+                    </div>
+                    <div className="progress-bar">
+                        <div
+                            className="progress-fill progress-fill-xp"
+                            style={{ width: `${quests.length > 0 ? (completedCount / quests.length) * 100 : 0}%` }}
+                        />
+                    </div>
+                </div>
+
+                {/* Full Quest List */}
+                <div className="tasks-content">
+                    {toggling && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--accent-blue)", fontSize: "0.85rem" }}>
+                            <Loader2 size={14} className="spinning" /> Syncing...
+                        </div>
+                    )}
+                    <QuestPanel
+                        quests={quests}
+                        date={today}
+                        onToggleSubtask={handleToggleSubtask}
+                        loading={toggling}
+                    />
+                </div>
+            </div>
+
+            <CreateQuestModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onQuestCreated={fetchQuests}
+            />
+        </div>
+    );
+}
