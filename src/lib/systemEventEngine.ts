@@ -1,30 +1,17 @@
 import connectDB from "@/lib/mongodb";
 import SystemEvent from "@/models/SystemEvent";
 import User from "@/models/User";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { systemEventPrompt } from "@/lib/ai/eventPrompts";
 import { evaluateRules, RuleResult } from "@/lib/system/ruleEngine";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-const AI_TIMEOUT_MS = 10000;
+import { aiRouter } from "@/lib/ai/aiRouter";
 
 // Only called when a rule flags requiresAI = true
 async function generateAIMessage(eventType: string, context: string): Promise<string> {
     const prompt = systemEventPrompt(eventType, context);
 
-    const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Event AI Timeout")), AI_TIMEOUT_MS)
-    );
-
     try {
-        const result = await Promise.race([
-            model.generateContent(prompt),
-            timeout
-        ]);
-        const text = (result as any).response.text();
-        return text.replace(/```[\s\S]*?```/g, "").trim();
+        const response = await aiRouter("notification", prompt);
+        return response.replace(/```[\s\S]*?```/g, "").trim();
     } catch (error: any) {
         console.error("[Event Engine] AI generation failed, using rule message:", error.message);
         return ""; // Empty = use the rule's static message instead

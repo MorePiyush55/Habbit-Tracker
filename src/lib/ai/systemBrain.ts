@@ -6,30 +6,7 @@ import GeneratedQuest from "@/models/GeneratedQuest";
 import SystemDecision from "@/models/SystemDecision";
 import SkillScore from "@/models/SkillScore";
 import { requiresGemini } from "@/lib/system/ruleEngine";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-const AI_TIMEOUT_MS = 15000;
-
-async function callBrain(prompt: string): Promise<string> {
-    const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("System Brain timeout")), AI_TIMEOUT_MS)
-    );
-
-    try {
-        const result = await Promise.race([
-            model.generateContent(prompt),
-            timeout
-        ]);
-        const text = (result as any).response.text();
-        return text.replace(/```[\s\S]*?```/g, "").trim();
-    } catch (error: any) {
-        console.error("[System Brain] AI call failed:", error.message);
-        throw error;
-    }
-}
+import { aiRouter } from "./aiRouter";
 
 function extractJSON(text: string): any {
     try {
@@ -305,7 +282,7 @@ Return ONLY valid JSON array:
 ]`;
 
     try {
-        const response = await callBrain(prompt);
+        const response = await aiRouter("strategy", prompt);
         const parsed = extractJSON(response);
 
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -386,7 +363,7 @@ DIRECTIVE
 [One sentence strategic command]`;
 
     try {
-        const response = await callBrain(prompt);
+        const response = await aiRouter("strategy", prompt);
         return response || getFallbackStrategy();
     } catch (error: any) {
         console.error("[System Brain] Strategy generation failed:", error.message);
@@ -517,17 +494,9 @@ Hunter's New Message:
 
 Respond as The System. Plain text only. No JSON. No markdown.`;
 
-    const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("AI_TIMEOUT")), 15000)
-    );
-
     try {
-        const response = await Promise.race([
-            model.generateContent(prompt),
-            timeout
-        ]);
-        const text = (response as any).response.text();
-        return { reply: text.replace(/```[\s\S]*?```/g, "").trim() };
+        const response = await aiRouter("chat", prompt);
+        return { reply: response.replace(/```[\s\S]*?```/g, "").trim() };
     } catch (e: any) {
         console.error("[System Brain SYSTEM_CHAT Error]:", e.message);
         return { reply: `⚠ SYSTEM NOTICE\n\nSystem malfunction detected.\nERROR: ${e.message}\nRetry your request.` };

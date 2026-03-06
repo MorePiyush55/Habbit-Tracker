@@ -4,24 +4,7 @@ import connectDB from "@/lib/mongodb";
 import SkillNode from "@/models/SkillNode";
 import SkillScore from "@/models/SkillScore";
 import SystemDecision from "@/models/SystemDecision";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-const AI_TIMEOUT_MS = 15000;
-
-async function callAI(prompt: string): Promise<string> {
-    const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Test AI timeout")), AI_TIMEOUT_MS)
-    );
-
-    const result = await Promise.race([
-        model.generateContent(prompt),
-        timeout
-    ]);
-    return (result as any).response.text().replace(/```[\s\S]*?```/g, "").trim();
-}
+import { aiRouter } from "@/lib/ai/aiRouter";
 
 function extractJSON(text: string): any {
     try {
@@ -79,7 +62,7 @@ Return ONLY valid JSON:
 }`;
 
             try {
-                const response = await callAI(prompt);
+                const response = await aiRouter("tutor", prompt);
                 const parsed = extractJSON(response);
 
                 if (parsed && parsed.question) {
@@ -148,7 +131,7 @@ Return ONLY valid JSON:
 }`;
 
             try {
-                const response = await callAI(prompt);
+                const response = await aiRouter("tutor", prompt);
                 const parsed = extractJSON(response);
 
                 if (parsed) {

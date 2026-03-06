@@ -2,12 +2,9 @@ import { getUserId } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { getTodayProgress } from "@/services/progressService";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { dailyDebriefPrompt } from "@/lib/ai/trainingPrompts";
 import { handleError, unauthorized } from "@/lib/apiError";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+import { aiRouter } from "@/lib/ai/aiRouter";
 
 export async function POST(req: Request) {
     try {
@@ -48,8 +45,8 @@ export async function POST(req: Request) {
 
         const prompt = dailyDebriefPrompt(JSON.stringify(dailyData, null, 2));
 
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const result = await aiRouter("analysis", prompt);
+        const text = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
         const debrief = JSON.parse(text);
 

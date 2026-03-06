@@ -1,5 +1,5 @@
 import { getUserId } from "@/lib/auth";
-import { generateMotivation } from "@/lib/ai/analysisService";
+import { aiRouter } from "@/lib/ai/aiRouter";
 import { handleError, unauthorized } from "@/lib/apiError";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
@@ -29,7 +29,22 @@ export async function GET() {
             })),
         };
 
-        const motivation = await generateMotivation(userId, playerData);
+        const prompt = `You are THE SYSTEM from Solo Leveling. Give a short 1-2 sentence motivation to the Hunter.
+        
+Hunter Data: ${JSON.stringify(playerData)}
+
+Return ONLY valid JSON:
+{
+  "message": "The motivation string"
+}`;
+
+        const response = await aiRouter("notification", prompt);
+        let motivation = { message: "System Notice: Continue the hunt." };
+        try {
+            motivation = JSON.parse(response);
+        } catch (e) {
+            console.error("[System Motivator Error]:", e);
+        }
         return Response.json(motivation);
     } catch (error) {
         return handleError(error);

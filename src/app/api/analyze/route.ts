@@ -1,5 +1,5 @@
 import { getUserId } from "@/lib/auth";
-import { generateWeeklyReport } from "@/lib/ai/analysisService";
+import { aiRouter } from "@/lib/ai/aiRouter";
 import { getProgressHistory } from "@/services/progressService";
 import { handleError, unauthorized } from "@/lib/apiError";
 import connectDB from "@/lib/mongodb";
@@ -24,7 +24,25 @@ export async function POST() {
             dailyProgress: history,
         };
 
-        const analysis = await generateWeeklyReport(userId, weekData);
+        const prompt = `You are THE SYSTEM from Solo Leveling. Generate a weekly performance analysis for the Hunter.
+        
+Data: ${JSON.stringify(weekData)}
+
+Return ONLY valid JSON:
+{
+  "strongHabits": ["Habit 1", "Habit 2"],
+  "weakHabits": ["Habit 3"],
+  "suggestions": ["Do this", "Do that"],
+  "report": "A short, cold, commanding assessment of their week."
+}`;
+
+        const response = await aiRouter("analysis", prompt);
+        let analysis = { strongHabits: [], weakHabits: [], suggestions: [], report: "AI parsing failed." };
+        try {
+            analysis = JSON.parse(response);
+        } catch (e) {
+            console.error("[System Analyzer Error]:", e);
+        }
 
         // Get current ISO week
         const now = new Date();

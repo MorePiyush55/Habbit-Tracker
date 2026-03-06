@@ -1,12 +1,9 @@
 import { getUserId } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import LearningPath from "@/models/LearningPath";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { aiRouter } from "@/lib/ai/aiRouter";
 import { trainingModePrompt } from "@/lib/ai/trainingPrompts";
 import { handleError, unauthorized } from "@/lib/apiError";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export async function POST(req: Request) {
     try {
@@ -37,8 +34,8 @@ export async function POST(req: Request) {
 
         const prompt = trainingModePrompt(JSON.stringify(learningData, null, 2));
 
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const result = await aiRouter("learning", prompt);
+        const text = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
         const quiz = JSON.parse(text);
 
