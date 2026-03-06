@@ -1,8 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { weeklyReportPrompt, motivationPrompt, weaknessAnalysisPrompt } from "./prompts";
+import { weeklyReportPrompt, motivationPrompt, weaknessAnalysisPrompt, systemChatPrompt } from "./prompts";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // Simple in-memory rate limiter (per-process)
@@ -54,6 +53,19 @@ export async function analyzeWeaknesses(userId: string, habitData: unknown) {
         throw new Error("AI rate limit exceeded. Maximum 10 calls per day.");
     }
     const prompt = weaknessAnalysisPrompt(JSON.stringify(habitData, null, 2));
+    const response = await callGemini(prompt);
+    return JSON.parse(response);
+}
+
+export async function generateSystemResponse(userId: string, userData: unknown, messageHistory: unknown[], userMessage: string) {
+    if (!checkRateLimit(userId)) {
+        throw new Error("AI rate limit exceeded. Maximum 10 calls per day.");
+    }
+    const prompt = systemChatPrompt(
+        JSON.stringify(userData, null, 2),
+        JSON.stringify(messageHistory.slice(-5), null, 2), // Send last 5 messages for context
+        userMessage
+    );
     const response = await callGemini(prompt);
     return JSON.parse(response);
 }
