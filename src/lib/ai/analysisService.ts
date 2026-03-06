@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { weeklyReportPrompt, motivationPrompt, weaknessAnalysisPrompt, systemChatPrompt } from "./prompts";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // Simple in-memory rate limiter (per-process)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
