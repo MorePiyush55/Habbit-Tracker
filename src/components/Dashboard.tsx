@@ -8,6 +8,7 @@ import BossBattle from "@/components/game/BossBattle";
 import StreakDisplay from "@/components/game/StreakDisplay";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemChat from "@/components/system/SystemChat";
+import SystemEventBanner from "@/components/system/SystemEventBanner";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import { LogOut } from "lucide-react";
@@ -152,68 +153,71 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="dashboard-grid">
-            {/* Left Sidebar */}
-            <div className="sidebar-left">
-                <PlayerStats
-                    name={user?.name || "Hunter"}
-                    photo={(user as Record<string, unknown>)?.image as string || ""}
-                    totalXP={userStats.totalXP}
-                    currentStreak={userStats.currentStreak}
-                    longestStreak={userStats.longestStreak}
-                    disciplineScore={userStats.disciplineScore}
-                    hunterRank={userStats.hunterRank}
-                />
-                <StreakDisplay
-                    currentStreak={userStats.currentStreak}
-                    longestStreak={userStats.longestStreak}
-                />
-                <AchievementBadges unlockedIds={[]} />
-                <button
-                    className="btn btn-secondary"
-                    onClick={() => signOut()}
-                    style={{ width: "100%" }}
-                    id="sign-out-btn"
-                >
-                    <LogOut size={16} />
-                    Sign Out
-                </button>
-            </div>
-
-            {/* Main Content */}
-            <div className="main-content">
-                <BossBattle
-                    bossHP={userStats.weeklyBossHP}
-                    isDefeated={userStats.bossDefeatedThisWeek}
-                    currentStreak={userStats.currentStreak}
-                />
-
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "-10px" }}>
-                    <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                        + Add Daily Task
+        <>
+            <SystemEventBanner />
+            <div className="dashboard-grid">
+                {/* Left Sidebar */}
+                <div className="sidebar-left">
+                    <PlayerStats
+                        name={user?.name || "Hunter"}
+                        photo={(user as Record<string, unknown>)?.image as string || ""}
+                        totalXP={userStats.totalXP}
+                        currentStreak={userStats.currentStreak}
+                        longestStreak={userStats.longestStreak}
+                        disciplineScore={userStats.disciplineScore}
+                        hunterRank={userStats.hunterRank}
+                    />
+                    <StreakDisplay
+                        currentStreak={userStats.currentStreak}
+                        longestStreak={userStats.longestStreak}
+                    />
+                    <AchievementBadges unlockedIds={[]} />
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => signOut()}
+                        style={{ width: "100%" }}
+                        id="sign-out-btn"
+                    >
+                        <LogOut size={16} />
+                        Sign Out
                     </button>
                 </div>
 
-                <QuestPanel
-                    quests={quests}
-                    date={today}
-                    onToggleSubtask={handleToggleSubtask}
-                    loading={toggling}
+                {/* Main Content */}
+                <div className="main-content">
+                    <BossBattle
+                        bossHP={userStats.weeklyBossHP}
+                        isDefeated={userStats.bossDefeatedThisWeek}
+                        currentStreak={userStats.currentStreak}
+                    />
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "-10px" }}>
+                        <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                            + Add Daily Task
+                        </button>
+                    </div>
+
+                    <QuestPanel
+                        quests={quests}
+                        date={today}
+                        onToggleSubtask={handleToggleSubtask}
+                        loading={toggling}
+                    />
+                </div>
+
+                {/* Right Sidebar: System AI Controller */}
+                <div className="sidebar-right">
+                    <SystemChat />
+                </div>
+
+                <CreateQuestModal
+                    isOpen={isCreateModalOpen}
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onQuestCreated={fetchProgress}
                 />
+
+                <ActiveTrainingUI />
             </div>
-
-            {/* Right Sidebar: System AI Controller */}
-            <div className="sidebar-right">
-                <SystemChat />
-            </div>
-
-            <CreateQuestModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-                onQuestCreated={fetchProgress}
-            />
-
-            <ActiveTrainingUI />
-        </div>
+        </>
     );
 }

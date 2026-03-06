@@ -7,6 +7,7 @@ import User from "@/models/User";
 import { calculateXP } from "@/lib/game-engine/xpSystem";
 import { getLevelFromXP } from "@/lib/game-engine/levelSystem";
 import { calculateStreak } from "@/lib/game-engine/streakSystem";
+import { checkAndFireEvents } from "@/lib/systemEventEngine";
 import { Difficulty } from "@/types";
 
 export async function getTodayProgress(userId: string, date: string) {
@@ -174,6 +175,30 @@ export async function toggleSubtaskProgress(
             user.lastCompletedDate = date;
             await user.save();
         }
+    }
+    // Fire System Events (non-blocking — don't crash the toggle if events fail)
+    try {
+        const user = await User.findById(userId).lean();
+        const questsCompleted = allHabits.filter(h => {
+            const habitEntries = allEntries.filter(e => e.habitId.toString() === h._id.toString() && e.completed);
+            const habitSubtaskCount = allEntries.filter(e => e.habitId.toString() === h._id.toString()).length || 1;
+            return habitEntries.length >= habitSubtaskCount;
+        }).length;
+
+        await checkAndFireEvents(userId, date, {
+            completionRate,
+            bossDefeated: raidCleared,
+            xpDelta,
+            totalXP: user?.totalXP || 0,
+            previousStreak: user?.currentStreak || 0,
+            currentStreak: user?.currentStreak || 0,
+            previousLevel: getLevelFromXP(Math.max(0, (user?.totalXP || 0) - xpDelta)),
+            currentLevel: user?.level || 1,
+            questsCompleted,
+            totalQuests: allHabits.length
+        });
+    } catch (eventError: any) {
+        console.error("[System Events] Non-fatal event processing error:", eventError.message);
     }
 
     return { totalXP, completionRate, bossDefeated, xpDelta };
