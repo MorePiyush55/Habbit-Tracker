@@ -7,6 +7,8 @@ import SystemDecision from "@/models/SystemDecision";
 import SkillScore from "@/models/SkillScore";
 import { requiresGemini } from "@/lib/system/ruleEngine";
 import { aiRouter } from "./aiRouter";
+import { buildSystemState } from "@/lib/core/systemState";
+import type { SystemState } from "@/types";
 
 function extractJSON(text: string): any {
     try {
@@ -70,6 +72,7 @@ function analyzeBehaviorPatterns(logs: any[]) {
 
 // ============================================================
 // CORE: System Decision — ALL AI decisions route through here
+// Now powered by Central System State from the AI Discipline OS.
 // ============================================================
 export async function systemDecision(
     userId: string,
@@ -79,107 +82,46 @@ export async function systemDecision(
     await connectDB();
 
     // ============================================================
-    // MEMORY LAYER: Gather comprehensive user context
+    // CENTRAL STATE: One call, complete picture of the user
     // ============================================================
-    const [user, habits, behaviorLogs, skillScores, skillNodes, learningPaths, recentDecisions] = await Promise.all([
-        User.findById(userId).lean(),
-        Habit.find({ userId, isActive: true }).lean(),
-        BehaviorLog.find({ userId }).sort({ date: -1 }).limit(30).lean(),
-        SkillScore.find({ userId }).sort({ score: 1 }).lean(),
-        (async () => {
-            try {
-                const SkillNode = (await import("@/models/SkillNode")).default;
-                return SkillNode.find({ userId, isActive: true }).lean();
-            } catch { return []; }
-        })(),
-        (async () => {
-            try {
-                const LearningPath = (await import("@/models/LearningPath")).default;
-                return LearningPath.find({ userId, isActive: true }).lean();
-            } catch { return []; }
-        })(),
-        (async () => {
-            try {
-                const SystemDecision = (await import("@/models/SystemDecision")).default;
-                return SystemDecision.find({ userId }).sort({ createdAt: -1 }).limit(10).lean();
-            } catch { return []; }
-        })()
-    ]);
+    const systemState = await buildSystemState(userId);
 
-    // Analyze 30-day behavior patterns
-    const behaviorAnalysis = analyzeBehaviorPatterns(behaviorLogs);
-
+    // Build the universal context from the centralized state
+    // This preserves backward compatibility with all existing action handlers
     const universalContext = {
-        // Core identity
-        hunter: {
-            level: user?.level || 1,
-            xp: user?.totalXP || 0,
-            streak: user?.currentStreak || 0,
-            longestStreak: user?.longestStreak || 0,
-            disciplineScore: user?.disciplineScore || 50,
-            focusScore: user?.focusScore || 50,
-            skillGrowthScore: user?.skillGrowthScore || 50,
-            hunterRank: user?.hunterRank || "E-Class"
-        },
+        hunter: systemState.hunter,
 
-        // Current habits with difficulty progression
-        habits: habits.map((h: any) => ({
-            title: h.title,
+        habits: systemState.activeHabits.map((h) => ({
+            title: h.name,
             category: h.category,
             difficulty: h.difficulty,
-            difficultyLevel: h.difficultyLevel || 1,
-            consecutiveCompletions: h.consecutiveCompletions || 0
+            difficultyLevel: h.difficultyLevel,
+            consecutiveCompletions: h.consecutiveCompletions,
         })),
 
-        // Skill proficiency (sorted weakest first)
-        skillProficiency: skillScores.map((s: any) => ({
+        skillProficiency: systemState.skillScores.map((s) => ({
             skill: s.skill,
             category: s.category,
             score: s.score,
-            testsCompleted: s.testsCompleted,
             trend: s.trend,
-            lastTested: s.lastTested ? new Date(s.lastTested).toISOString().split("T")[0] : "never"
+            lastTested: s.lastTested,
         })),
 
-        // Skill graph (knowledge relationships)
-        skillGraph: (skillNodes as any[]).map((n: any) => ({
-            skill: n.skill,
-            category: n.category,
-            relatedSkills: n.relatedSkills,
-            difficulty: n.difficulty
+        behaviorTrend: systemState.recentBehavior.map((b) => ({
+            date: b.date,
+            completionRate: b.completionRate,
+            tasksCompleted: b.tasksCompleted,
+            tasksFailed: b.tasksFailed,
+            weakHabits: b.weakHabits,
+            strongHabits: b.strongHabits,
         })),
 
-        // Learning paths progress
-        learningProgress: (learningPaths as any[]).map((lp: any) => ({
-            title: lp.title,
-            progress: `${lp.completedSections}/${lp.totalSections}`,
-            percentComplete: lp.totalSections > 0 ? Math.round((lp.completedSections / lp.totalSections) * 100) : 0,
-            weakTopics: lp.weakTopics || [],
-            masteredTopics: lp.masteredTopics || []
-        })),
+        behaviorPatterns: systemState.behaviorAnalysis,
 
-        // 7-day behavior trend (recent)
-        behaviorTrend: behaviorLogs.slice(0, 7).map((log: any) => ({
-            date: log.date,
-            completionRate: log.completionRate,
-            tasksCompleted: log.tasksCompleted,
-            tasksFailed: log.tasksFailed,
-            weakHabits: log.weakHabits,
-            strongHabits: log.strongHabits
-        })),
-
-        // 30-day behavioral patterns (analyzed)
-        behaviorPatterns: behaviorAnalysis,
-
-        // Recent AI decisions (for context continuity)
-        recentSystemActions: (recentDecisions as any[]).slice(0, 5).map((d: any) => ({
-            action: d.decisionType,
-            reason: d.reason,
-            date: d.date
-        })),
+        recentSystemActions: systemState.recentDecisions,
 
         // Caller-supplied context
-        ...context
+        ...context,
     };
 
     let result;

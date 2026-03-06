@@ -7,10 +7,10 @@ import User from "@/models/User";
 import { calculateXP } from "@/lib/game-engine/xpSystem";
 import { getLevelFromXP } from "@/lib/game-engine/levelSystem";
 import { calculateStreak } from "@/lib/game-engine/streakSystem";
-import { checkAndFireEvents } from "@/lib/systemEventEngine";
 import { incrementConsecutiveCompletion } from "@/lib/game-engine/difficultyScaler";
 import BehaviorLog from "@/models/BehaviorLog";
 import { Difficulty } from "@/types";
+import { emit, SystemEvents } from "@/lib/core/eventBus";
 
 export async function getTodayProgress(userId: string, date: string) {
     await connectDB();
@@ -178,29 +178,51 @@ export async function toggleSubtaskProgress(
             await user.save();
         }
     }
-    // Fire System Events (non-blocking — don't crash the toggle if events fail)
+    // ============================================================
+    // EVENT BUS INTEGRATION — Fire events into the AI Discipline OS
+    // ============================================================
     try {
         const user = await User.findById(userId).lean();
-        const questsCompleted = allHabits.filter(h => {
-            const habitEntries = allEntries.filter(e => e.habitId.toString() === h._id.toString() && e.completed);
-            const habitSubtaskCount = allEntries.filter(e => e.habitId.toString() === h._id.toString()).length || 1;
-            return habitEntries.length >= habitSubtaskCount;
-        }).length;
+        const previousLevel = getLevelFromXP(Math.max(0, (user?.totalXP || 0) - xpDelta));
+        const currentLevel = user?.level || 1;
 
-        await checkAndFireEvents(userId, date, {
-            completionRate,
-            bossDefeated: raidCleared,
-            xpDelta,
-            totalXP: user?.totalXP || 0,
-            previousStreak: user?.currentStreak || 0,
-            currentStreak: user?.currentStreak || 0,
-            previousLevel: getLevelFromXP(Math.max(0, (user?.totalXP || 0) - xpDelta)),
-            currentLevel: user?.level || 1,
-            questsCompleted,
-            totalQuests: allHabits.length
-        });
+        // 1. Core event: Subtask toggled
+        await emit(SystemEvents.subtaskToggled(userId, habitId, subtaskId, completed, xpDelta));
+
+        // 2. Check for level up
+        if (currentLevel > previousLevel) {
+            await emit(SystemEvents.levelUp(userId, previousLevel, currentLevel));
+        }
+
+        // 3. Check for boss defeat
+        if (raidCleared) {
+            await emit(SystemEvents.bossDefeated(userId));
+        }
+
+        // 4. Check completion rate thresholds
+        if (completionRate === 100) {
+            await emit(SystemEvents.allTasksDone(userId, user?.totalXP || 0));
+        } else if (completionRate > 0 && completionRate < 50) {
+            await emit(SystemEvents.weakProgress(userId, completionRate));
+        }
+
+        // 5. Check for full habit completion (all subtasks done)
+        if (completed) {
+            const habitEntries = allEntries.filter(
+                (e) => e.habitId.toString() === habitId && e.completed
+            );
+            const habitSubtaskCount = await Subtask.countDocuments({ habitId });
+            if (habitEntries.length >= habitSubtaskCount && habitSubtaskCount > 0) {
+                await emit(SystemEvents.taskCompleted(userId, habitId, habit.title, totalXP));
+            }
+        }
+
+        // 6. Check discipline score
+        if ((user?.disciplineScore || 50) >= 75) {
+            await emit(SystemEvents.disciplineImprovement(userId, user?.disciplineScore || 75));
+        }
     } catch (eventError: any) {
-        console.error("[System Events] Non-fatal event processing error:", eventError.message);
+        console.error("[Event Bus] Non-fatal event processing error:", eventError.message);
     }
 
     // Log Behavior Snapshot (non-blocking)
@@ -210,15 +232,15 @@ export async function toggleSubtaskProgress(
         const weakHabits = allHabits
             .filter(h => {
                 const entries = allEntries.filter(e => e.habitId.toString() === h._id.toString());
-                const completed = entries.filter(e => e.completed).length;
-                return entries.length > 0 && completed / entries.length < 0.5;
+                const completedCount = entries.filter(e => e.completed).length;
+                return entries.length > 0 && completedCount / entries.length < 0.5;
             })
             .map(h => h.title);
         const strongHabits = allHabits
             .filter(h => {
                 const entries = allEntries.filter(e => e.habitId.toString() === h._id.toString());
-                const completed = entries.filter(e => e.completed).length;
-                return entries.length > 0 && completed / entries.length >= 0.8;
+                const completedCount = entries.filter(e => e.completed).length;
+                return entries.length > 0 && completedCount / entries.length >= 0.8;
             })
             .map(h => h.title);
 

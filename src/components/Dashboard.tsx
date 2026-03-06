@@ -90,6 +90,13 @@ export default function Dashboard() {
     useEffect(() => {
         fetchProgress();
 
+        // Emit SESSION_START event into the AI Discipline OS
+        fetch("/api/system/process-event", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventType: "SESSION_START" }),
+        }).catch(() => {/* non-blocking */});
+
         // Poll every 30 seconds
         const interval = setInterval(fetchProgress, 30000);
         return () => clearInterval(interval);

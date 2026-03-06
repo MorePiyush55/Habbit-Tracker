@@ -1,5 +1,6 @@
 import { getUserId } from "@/lib/auth";
-import { systemDecision } from "@/lib/ai/systemBrain";
+import { buildSystemState } from "@/lib/core/systemState";
+import { generateDailyStrategy } from "@/lib/core/strategyGenerator";
 import { handleError, unauthorized } from "@/lib/apiError";
 
 export async function GET() {
@@ -7,9 +8,21 @@ export async function GET() {
         const userId = await getUserId();
         if (!userId) return unauthorized();
 
-        const strategy = await systemDecision(userId, "DAILY_STRATEGY", {});
+        // Build the central system state, then generate strategy from it
+        const state = await buildSystemState(userId);
+        const strategyResult = await generateDailyStrategy(state);
 
-        return Response.json({ strategy });
+        // Return the raw text for backward compatibility with the UI
+        return Response.json({
+            strategy: strategyResult.rawText,
+            structured: {
+                morning: strategyResult.morning,
+                afternoon: strategyResult.afternoon,
+                evening: strategyResult.evening,
+                directive: strategyResult.directive,
+            },
+            usedAI: strategyResult.usedAI,
+        });
     } catch (error) {
         return handleError(error);
     }

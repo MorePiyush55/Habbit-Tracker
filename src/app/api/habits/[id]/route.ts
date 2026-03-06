@@ -29,7 +29,7 @@ export async function DELETE(
         if (!userId) return unauthorized();
 
         const { id } = await context.params;
-        await deleteHabit(id);
+        await deleteHabit(id, userId);
         return Response.json({ success: true });
     } catch (error) {
         return handleError(error);

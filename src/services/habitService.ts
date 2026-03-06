@@ -3,6 +3,7 @@ import Habit from "@/models/Habit";
 import Subtask from "@/models/Subtask";
 import User from "@/models/User";
 import { DEFAULT_TASKS } from "@/lib/defaultTasks";
+import { emit, SystemEvents } from "@/lib/core/eventBus";
 
 export async function getHabits(userId: string) {
     await connectDB();
@@ -55,6 +56,11 @@ export async function createHabit(userId: string, data: {
         await Subtask.insertMany(subtaskDocs);
     }
 
+    // Emit HABIT_CREATED event into the AI Discipline OS
+    try {
+        await emit(SystemEvents.habitCreated(userId, habit._id.toString(), data.title));
+    } catch { /* non-blocking */ }
+
     return habit;
 }
 
@@ -88,8 +94,17 @@ export async function updateHabit(habitId: string, data: Partial<{
     return Habit.findByIdAndUpdate(habitId, data, { new: true }).lean();
 }
 
-export async function deleteHabit(habitId: string) {
+export async function deleteHabit(habitId: string, userId?: string) {
     await connectDB();
     await Subtask.deleteMany({ habitId });
-    return Habit.findByIdAndDelete(habitId);
+    const result = await Habit.findByIdAndDelete(habitId);
+
+    // Emit HABIT_DELETED event into the AI Discipline OS
+    if (userId) {
+        try {
+            await emit(SystemEvents.habitDeleted(userId, habitId));
+        } catch { /* non-blocking */ }
+    }
+
+    return result;
 }
