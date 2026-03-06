@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, Send, X, ShieldAlert, Zap } from "lucide-react";
+import { Send, ShieldAlert, Zap } from "lucide-react";
 
 interface ChatMessage {
     _id: string;
@@ -9,7 +9,6 @@ interface ChatMessage {
 }
 
 export default function SystemChat() {
-    const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -17,7 +16,7 @@ export default function SystemChat() {
 
     // Fetch history
     useEffect(() => {
-        if (isOpen && messages.length === 0) {
+        if (messages.length === 0) {
             fetch("/api/system/chat")
                 .then(res => res.json())
                 .then(data => {
@@ -25,7 +24,7 @@ export default function SystemChat() {
                 })
                 .catch(err => console.error("Error fetching chat:", err));
         }
-    }, [isOpen]);
+    }, []);
 
     // Scroll to bottom
     useEffect(() => {
@@ -83,71 +82,51 @@ export default function SystemChat() {
     };
 
     return (
-        <>
-            {/* Floating Action Button */}
-            {!isOpen && (
-                <button
-                    onClick={() => setIsOpen(true)}
-                    className="system-chat-fab"
-                    title="Open System Interface"
-                >
-                    <MessageSquare size={24} />
-                    <span className="fab-pulse"></span>
-                </button>
-            )}
-
-            {/* Chat Window */}
-            {isOpen && (
-                <div className="system-chat-window glass-card">
-                    <div className="chat-header">
-                        <div className="chat-title">
-                            <ShieldAlert size={18} className="system-icon" />
-                            <span>THE SYSTEM</span>
-                        </div>
-                        <button onClick={() => setIsOpen(false)} className="icon-btn">
-                            <X size={20} />
-                        </button>
-                    </div>
-
-                    <div className="chat-messages">
-                        {messages.length === 0 && !loading && (
-                            <div className="system-message system-announcement">
-                                [HUNTER STATUS DETECTED: AWAITING INPUT. EXPLAIN YOUR ACTIONS.]
-                            </div>
-                        )}
-
-                        {messages.map((msg) => (
-                            <div key={msg._id} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'}`}>
-                                {msg.role === 'system' && <Zap size={14} className="system-spark" />}
-                                <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
-                            </div>
-                        ))}
-
-                        {loading && (
-                            <div className="chat-bubble system-bubble typing">
-                                <span className="dot"></span>
-                                <span className="dot"></span>
-                                <span className="dot"></span>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    <form onSubmit={handleSend} className="chat-input-area">
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Respond to the System..."
-                            className="game-input chat-input"
-                            disabled={loading}
-                        />
-                        <button type="submit" className="btn-primary chat-send-btn" disabled={!input.trim() || loading}>
-                            <Send size={18} />
-                        </button>
-                    </form>
+        <div className="system-chat-window glass-card" style={{ position: "relative", width: "100%", height: "100%", bottom: 0, right: 0, padding: 0 }}>
+            <div className="chat-header">
+                <div className="chat-title">
+                    <ShieldAlert size={18} className="system-icon" />
+                    <span>THE SYSTEM</span>
                 </div>
-            )}
-        </>
+            </div>
+
+            <div className="chat-messages" style={{ height: "calc(100vh - 250px)" }}>
+                {messages.length === 0 && !loading && (
+                    <div className="system-message system-announcement">
+                        [HUNTER STATUS DETECTED: AWAITING INPUT. EXPLAIN YOUR ACTIONS.]
+                    </div>
+                )}
+
+                {messages.map((msg) => (
+                    <div key={msg._id} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'}`}>
+                        {msg.role === 'system' && <Zap size={14} className="system-spark" />}
+                        <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                    </div>
+                ))}
+
+                {loading && (
+                    <div className="chat-bubble system-bubble typing">
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
+            </div>
+
+            <form onSubmit={handleSend} className="chat-input-area" style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "var(--space-md)" }}>
+                <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Respond to the System..."
+                    className="game-input chat-input"
+                    disabled={loading}
+                />
+                <button type="submit" className="btn-primary chat-send-btn" disabled={!input.trim() || loading} style={{ marginLeft: "var(--space-sm)" }}>
+                    <Send size={18} />
+                </button>
+            </form>
+        </div>
     );
 }

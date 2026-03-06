@@ -10,8 +10,6 @@ import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemChat from "@/components/system/SystemChat";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
-import AIInsightsPanel from "@/components/ai/AIInsightsPanel";
-import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
 import { LogOut } from "lucide-react";
 
 interface Subtask {
@@ -195,7 +193,7 @@ export default function Dashboard() {
                         <span className="section-title-icon">📜</span> TODAY'S QUESTS
                     </h2>
                     <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                        + Add Quest
+                        + Add Daily Task
                     </button>
                 </div>
 
@@ -205,12 +203,11 @@ export default function Dashboard() {
                     onToggleSubtask={handleToggleSubtask}
                     loading={toggling}
                 />
-                <AnalyticsDashboard />
             </div>
 
-            {/* Right Sidebar */}
+            {/* Right Sidebar: System AI Controller */}
             <div className="sidebar-right">
-                <AIInsightsPanel />
+                <SystemChat />
             </div>
 
             <CreateQuestModal
@@ -219,7 +216,6 @@ export default function Dashboard() {
                 onQuestCreated={fetchProgress}
             />
 
-            <SystemChat />
             <ActiveTrainingUI />
         </div>
     );

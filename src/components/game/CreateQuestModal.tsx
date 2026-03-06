@@ -105,7 +105,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content glass-card" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2 className="section-title" style={{ margin: 0 }}>Create Custom Quest</h2>
+                    <h2 className="section-title" style={{ margin: 0 }}>CREATE DAILY TASK</h2>
                     <button className="icon-btn" onClick={onClose}><X size={20} /></button>
                 </div>
 

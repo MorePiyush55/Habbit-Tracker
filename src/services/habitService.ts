@@ -1,6 +1,7 @@
 import connectDB from "@/lib/mongodb";
 import Habit from "@/models/Habit";
 import Subtask from "@/models/Subtask";
+import User from "@/models/User";
 import { DEFAULT_TASKS } from "@/lib/defaultTasks";
 
 export async function getHabits(userId: string) {
@@ -57,6 +58,13 @@ export async function createHabit(userId: string, data: {
 
 export async function seedDefaultTasks(userId: string) {
     await connectDB();
+
+    // Phase 6 Restriction: Only seed defaults for the specific user.
+    const user = await User.findById(userId).lean();
+    if (!user || user.email !== "piyushmore5553@gmail.com") {
+        return false;
+    }
+
     const existingCount = await Habit.countDocuments({ userId });
     if (existingCount > 0) return false; // Already seeded
 
