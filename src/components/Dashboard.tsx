@@ -8,6 +8,7 @@ import BossBattle from "@/components/game/BossBattle";
 import StreakDisplay from "@/components/game/StreakDisplay";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemChat from "@/components/system/SystemChat";
+import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AIInsightsPanel from "@/components/ai/AIInsightsPanel";
 import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
@@ -201,6 +202,7 @@ export default function Dashboard() {
             />
 
             <SystemChat />
+            <ActiveTrainingUI />
         </div>
     );
 }
