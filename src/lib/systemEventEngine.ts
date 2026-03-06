@@ -1,17 +1,17 @@
 import connectDB from "@/lib/mongodb";
 import SystemEvent from "@/models/SystemEvent";
 import User from "@/models/User";
-import DailyProgress from "@/models/DailyProgress";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { systemEventPrompt } from "@/lib/ai/eventPrompts";
+import { evaluateRules, RuleResult } from "@/lib/system/ruleEngine";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const AI_TIMEOUT_MS = 10000;
 
-// Generates a short AI message for the event
-async function generateEventMessage(eventType: string, context: string): Promise<string> {
+// Only called when a rule flags requiresAI = true
+async function generateAIMessage(eventType: string, context: string): Promise<string> {
     const prompt = systemEventPrompt(eventType, context);
 
     const timeout = new Promise<never>((_, reject) =>
@@ -26,26 +26,9 @@ async function generateEventMessage(eventType: string, context: string): Promise
         const text = (result as any).response.text();
         return text.replace(/```[\s\S]*?```/g, "").trim();
     } catch (error: any) {
-        console.error("[Event Engine] AI generation failed:", error.message);
-        // Fallback: use a static message
-        return getStaticFallback(eventType);
+        console.error("[Event Engine] AI generation failed, using rule message:", error.message);
+        return ""; // Empty = use the rule's static message instead
     }
-}
-
-function getStaticFallback(eventType: string): string {
-    const fallbacks: Record<string, string> = {
-        TASK_FAILED: "[WARNING] Hunter, you have failed a quest today. Explain yourself.",
-        STREAK_BROKEN: "[ALERT] Your streak has been broken. Discipline is declining. The System is watching.",
-        GOAL_COMPLETED: "[NOTICE] Quest completed. Acknowledged. Do not rest — more challenges await.",
-        WEAK_PROGRESS: "[WARNING] Progress below acceptable threshold. Increase your output immediately.",
-        BOSS_DEFEATED: "[COMMENDATION] The Discipline Titan has fallen. But the next one will be stronger.",
-        LEVEL_UP: "[NOTICE] Power level increased. New expectations have been set. Do not disappoint.",
-        ALL_TASKS_DONE: "[COMMENDATION] All quests completed. Adequate. Maintain this standard tomorrow.",
-        SKILL_DEGRADATION: "[WARNING] Hunter, a skill has not been tested in over 7 days. Knowledge is deteriorating.",
-        INACTIVITY_WARNING: "[ALERT] Hunter. You have been inactive today. Resume training immediately.",
-        DISCIPLINE_IMPROVEMENT: "[COMMENDATION] Your discipline score is improving. Do not become complacent."
-    };
-    return fallbacks[eventType] || "[NOTICE] System event detected.";
 }
 
 // Check if an event was already triggered today for this user and type
@@ -54,7 +37,9 @@ async function wasEventTriggeredToday(userId: string, eventType: string, date: s
     return !!existing;
 }
 
-// Core engine: detect and fire events
+// ============================================================
+// HYBRID ENGINE: Rules first, Gemini only when needed
+// ============================================================
 export async function checkAndFireEvents(
     userId: string,
     date: string,
@@ -74,61 +59,60 @@ export async function checkAndFireEvents(
     await connectDB();
     const firedEvents: { eventType: string; message: string }[] = [];
 
-    // 1. ALL_TASKS_DONE — 100% completion rate
-    if (context.completionRate === 100) {
-        if (!(await wasEventTriggeredToday(userId, "ALL_TASKS_DONE", date))) {
-            const msg = await generateEventMessage("ALL_TASKS_DONE",
-                `Completion Rate: 100%. Quests: ${context.questsCompleted}/${context.totalQuests}. XP: ${context.totalXP}.`);
-            await SystemEvent.create({ userId, eventType: "ALL_TASKS_DONE", message: msg, date });
-            firedEvents.push({ eventType: "ALL_TASKS_DONE", message: msg });
-        }
-    }
+    // Get user data for full rule context
+    const user = await User.findById(userId).lean();
 
-    // 2. WEAK_PROGRESS — below 50% with at least some activity
-    if (context.completionRate > 0 && context.completionRate < 50 && context.questsCompleted >= 1) {
-        if (!(await wasEventTriggeredToday(userId, "WEAK_PROGRESS", date))) {
-            const msg = await generateEventMessage("WEAK_PROGRESS",
-                `Completion Rate: ${context.completionRate}%. Only ${context.questsCompleted}/${context.totalQuests} quests touched.`);
-            await SystemEvent.create({ userId, eventType: "WEAK_PROGRESS", message: msg, date });
-            firedEvents.push({ eventType: "WEAK_PROGRESS", message: msg });
-        }
-    }
+    // === STEP 1: Run Rule Engine (instant, zero AI cost) ===
+    const ruleResults = evaluateRules({
+        completionRate: context.completionRate,
+        tasksCompleted: context.questsCompleted,
+        tasksFailed: context.totalQuests - context.questsCompleted,
+        totalTasks: context.totalQuests,
+        currentStreak: context.currentStreak,
+        previousStreak: context.previousStreak,
+        longestStreak: user?.longestStreak || 0,
+        xpEarned: context.xpDelta,
+        totalXP: context.totalXP,
+        xpDelta: context.xpDelta,
+        currentLevel: context.currentLevel,
+        previousLevel: context.previousLevel,
+        bossDefeated: context.bossDefeated,
+        weeklyBossHP: user?.weeklyBossHP || 500,
+        disciplineScore: user?.disciplineScore || 50,
+        focusScore: user?.focusScore || 50,
+        consecutiveMissedDays: 0,
+        habitMissedDays: {}
+    });
 
-    // 3. BOSS_DEFEATED
-    if (context.bossDefeated) {
-        if (!(await wasEventTriggeredToday(userId, "BOSS_DEFEATED", date))) {
-            const msg = await generateEventMessage("BOSS_DEFEATED",
-                `Boss HP drained to 0. Streak: ${context.currentStreak} days. Total XP: ${context.totalXP}.`);
-            await SystemEvent.create({ userId, eventType: "BOSS_DEFEATED", message: msg, date });
-            firedEvents.push({ eventType: "BOSS_DEFEATED", message: msg });
-        }
-    }
+    console.log(`[Event Engine] Rule Engine produced ${ruleResults.length} events (${ruleResults.filter(r => r.requiresAI).length} need AI)`);
 
-    // 4. LEVEL_UP
-    if (context.currentLevel > context.previousLevel) {
-        if (!(await wasEventTriggeredToday(userId, "LEVEL_UP", date))) {
-            const msg = await generateEventMessage("LEVEL_UP",
-                `Level ${context.previousLevel} → Level ${context.currentLevel}. Total XP: ${context.totalXP}.`);
-            await SystemEvent.create({ userId, eventType: "LEVEL_UP", message: msg, date });
-            firedEvents.push({ eventType: "LEVEL_UP", message: msg });
+    // === STEP 2: Process each rule result ===
+    for (const rule of ruleResults) {
+        // Skip if already triggered today
+        if (await wasEventTriggeredToday(userId, rule.eventType, date)) {
+            continue;
         }
-    }
 
-    // 5. STREAK_BROKEN (when streak resets to 0 from a positive value)
-    if (context.currentStreak === 0 && context.previousStreak > 0) {
-        if (!(await wasEventTriggeredToday(userId, "STREAK_BROKEN", date))) {
-            const msg = await generateEventMessage("STREAK_BROKEN",
-                `Previous streak: ${context.previousStreak} days. Now: 0. The chain is broken.`);
-            await SystemEvent.create({ userId, eventType: "STREAK_BROKEN", message: msg, date });
-            firedEvents.push({ eventType: "STREAK_BROKEN", message: msg });
+        let finalMessage = rule.message;
+
+        // === STEP 3: Only call Gemini if the rule flags requiresAI ===
+        if (rule.requiresAI && rule.aiContext) {
+            const aiMessage = await generateAIMessage(rule.eventType, rule.aiContext);
+            if (aiMessage) {
+                finalMessage = aiMessage; // Use AI-generated message
+            }
+            // If AI fails, the rule's static message is used (fallback built-in)
         }
-    }
 
-    // 6. GOAL_COMPLETED — triggered when any quest hits 100% for the first time
-    if (context.completionRate < 100 && context.questsCompleted > 0) {
-        // We track this at the quest level — "individual quest completed" 
-        // This is handled by checking if xpDelta indicates a full quest was just finished
-        // (Simplified: fires when individual habits reach 100% — more granular event detection needed)
+        // Save the event
+        await SystemEvent.create({
+            userId,
+            eventType: rule.eventType,
+            message: finalMessage,
+            date
+        });
+
+        firedEvents.push({ eventType: rule.eventType, message: finalMessage });
     }
 
     return firedEvents;

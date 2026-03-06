@@ -5,6 +5,7 @@ import BehaviorLog from "@/models/BehaviorLog";
 import GeneratedQuest from "@/models/GeneratedQuest";
 import SystemDecision from "@/models/SystemDecision";
 import SkillScore from "@/models/SkillScore";
+import { requiresGemini } from "@/lib/system/ruleEngine";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -91,6 +92,9 @@ export async function systemDecision(
 
     let result;
     const today = new Date().toISOString().split("T")[0];
+    const usedAI = requiresGemini(actionType);
+
+    console.log(`[System Brain] Action: ${actionType} | AI Required: ${usedAI}`);
 
     switch (actionType) {
         case "GENERATE_QUESTS":
@@ -103,9 +107,11 @@ export async function systemDecision(
             result = await analyzeBehavior(universalContext);
             break;
         case "DIFFICULTY_CHECK":
+            // Rule-only: no Gemini call needed
             result = await checkDifficultyScaling(userId, universalContext);
             break;
         case "BOSS_ADJUSTMENT":
+            // Rule-only: no Gemini call needed
             result = await adjustBossDifficulty(userId, universalContext);
             break;
         default:
@@ -117,7 +123,7 @@ export async function systemDecision(
         await SystemDecision.create({
             userId,
             decisionType: actionType,
-            reason: `System Brain executed: ${actionType}`,
+            reason: `System Brain executed: ${actionType} (AI: ${usedAI ? "yes" : "no"})`,
             context: { hunter: universalContext.hunter },
             result: typeof result === 'string' ? { text: result.substring(0, 200) } : { summary: JSON.stringify(result).substring(0, 200) },
             date: today
