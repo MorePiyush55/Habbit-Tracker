@@ -26,7 +26,7 @@ import KnowledgeNode from "@/models/KnowledgeNode";
 // Types
 // ============================================================
 
-export interface KnowledgeNodeData {
+interface KnowledgeNodeData {
     nodeId: string;
     name: string;
     category: string;
@@ -39,7 +39,7 @@ export interface KnowledgeNodeData {
     isActive: boolean;
 }
 
-export interface KnowledgeCluster {
+interface KnowledgeCluster {
     category: string;
     nodes: KnowledgeNodeData[];
     avgMastery: number;
@@ -49,7 +49,7 @@ export interface KnowledgeCluster {
     completionRate: number; // % of nodes with mastery >= 70
 }
 
-export interface KnowledgeGraphSnapshot {
+interface KnowledgeGraphSnapshot {
     clusters: KnowledgeCluster[];
     totalNodes: number;
     avgMastery: number;
@@ -61,7 +61,7 @@ export interface KnowledgeGraphSnapshot {
     readyToLearn: string[];       // nodes whose dependencies are all mastered
 }
 
-export interface LearningPathStep {
+interface LearningPathStep {
     nodeId: string;
     name: string;
     category: string;
@@ -127,7 +127,7 @@ export async function bulkUpsertNodes(
 }
 
 /** Get a single node */
-export async function getNode(userId: string, nodeId: string): Promise<KnowledgeNodeData | null> {
+async function getNode(userId: string, nodeId: string): Promise<KnowledgeNodeData | null> {
     await connectDB();
     const doc = await KnowledgeNode.findOne({ userId, nodeId, isActive: true }).lean();
     return doc ? docToNode(doc) : null;
@@ -163,7 +163,7 @@ export async function removeNode(userId: string, nodeId: string): Promise<boolea
 // ============================================================
 
 /** Get all dependencies of a node (transitive) */
-export async function getDependencyChain(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
+async function getDependencyChain(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
     const allNodes = await getAllNodes(userId);
     const nodeMap = new Map(allNodes.map((n) => [n.nodeId, n]));
     const visited = new Set<string>();
@@ -189,7 +189,7 @@ export async function getDependencyChain(userId: string, nodeId: string): Promis
 }
 
 /** Get nodes that depend on a given node (reverse dependencies) */
-export async function getDependents(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
+async function getDependents(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
     await connectDB();
     const docs = await KnowledgeNode.find({
         userId,
@@ -200,7 +200,7 @@ export async function getDependents(userId: string, nodeId: string): Promise<Kno
 }
 
 /** Get related topics: dependencies + dependents + same category */
-export async function getRelatedTopics(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
+async function getRelatedTopics(userId: string, nodeId: string): Promise<KnowledgeNodeData[]> {
     const node = await getNode(userId, nodeId);
     if (!node) return [];
 

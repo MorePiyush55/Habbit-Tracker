@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 
 // HuggingFace Router Client for Qwen and DeepSeek
-export const hfClient = new OpenAI({
+const hfClient = new OpenAI({
     baseURL: "https://router.huggingface.co/v1",
     apiKey: process.env.HF_TOKEN || "dummy-key-for-build",
 });

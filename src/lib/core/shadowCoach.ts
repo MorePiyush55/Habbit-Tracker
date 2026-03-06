@@ -23,7 +23,7 @@ import type { DailyStrategy } from "./strategyGenerator";
 // Types
 // ============================================================
 
-export interface CoachReview {
+interface CoachReview {
     approved: boolean;
     adjustments: CoachAdjustment[];
     warnings: string[];
@@ -32,7 +32,7 @@ export interface CoachReview {
     summary: string;
 }
 
-export interface CoachAdjustment {
+interface CoachAdjustment {
     target: string;          // What was adjusted
     original: string;        // Original value
     adjusted: string;        // New value

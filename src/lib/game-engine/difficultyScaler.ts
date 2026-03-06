@@ -25,11 +25,11 @@ export async function incrementConsecutiveCompletion(habitId: string) {
     return habit;
 }
 
-export function resetConsecutiveCompletion(habitId: string) {
+function resetConsecutiveCompletion(habitId: string) {
     return Habit.findByIdAndUpdate(habitId, { consecutiveCompletions: 0 });
 }
 
-export function getDifficultyLabel(level: number): string {
+function getDifficultyLabel(level: number): string {
     const labels = ["Beginner", "Intermediate", "Advanced", "Expert", "Master"];
     return labels[Math.min(level - 1, 4)] || "Beginner";
 }

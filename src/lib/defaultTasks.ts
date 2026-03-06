@@ -1,4 +1,4 @@
-export interface DefaultTask {
+interface DefaultTask {
     title: string;
     category: string;
     difficulty: "small" | "medium" | "hard";

@@ -31,7 +31,7 @@ import { updateNodeMastery } from "./knowledgeGraph";
 // Types
 // ============================================================
 
-export interface SkillMasteryData {
+interface SkillMasteryData {
     skillId: string;
     name: string;
     category: string;
@@ -54,7 +54,7 @@ export interface SkillMasteryData {
     linkedNodeIds: string[];
 }
 
-export interface SkillMasteryReport {
+interface SkillMasteryReport {
     skills: SkillMasteryData[];
     totalSkills: number;
     avgMastery: number;
@@ -67,7 +67,7 @@ export interface SkillMasteryReport {
     trendSummary: string;            // "3 improving, 1 declining, 2 stable"
 }
 
-export interface MasteryUpdateResult {
+interface MasteryUpdateResult {
     skillId: string;
     previousMastery: number;
     newMastery: number;
@@ -76,7 +76,7 @@ export interface MasteryUpdateResult {
     leveledUp: boolean;              // crossed a threshold (e.g. 50→60)
 }
 
-export interface DecayCheckResult {
+interface DecayCheckResult {
     decayedSkills: Array<{ skillId: string; name: string; mastery: number; daysInactive: number }>;
     totalDecayed: number;
     warningSkills: Array<{ skillId: string; name: string; daysInactive: number }>;

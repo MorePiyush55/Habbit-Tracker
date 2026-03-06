@@ -13,12 +13,12 @@ export const habitSchema = z.object({
     isDaily: z.boolean().optional(),
 });
 
-export const subtaskSchema = z.object({
+const subtaskSchema = z.object({
     title: z.string().min(1, "Title is required"),
     order: z.number().optional(),
 });
 
-export const progressEntrySchema = z.object({
+const progressEntrySchema = z.object({
     habitId: z.string().min(1),
     subtaskId: z.string().optional(),
     completed: z.boolean(),

@@ -25,14 +25,14 @@ function extractJSON(text: string): any {
     return null;
 }
 
-export interface TrainingQuestion {
+interface TrainingQuestion {
     topic: string;
     question: string;
     difficulty: "easy" | "medium" | "hard";
     hint: string;
 }
 
-export interface GradeResult {
+interface GradeResult {
     correct: boolean;
     score: number;
     feedback: string;
@@ -132,7 +132,7 @@ Return ONLY valid JSON:
 // ============================================================
 // GRADE: Evaluate a Hunter's answer
 // ============================================================
-export async function gradeAnswer(
+async function gradeAnswer(
     userId: string,
     skill: string,
     question: string,

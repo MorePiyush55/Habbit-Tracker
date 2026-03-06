@@ -30,7 +30,7 @@ import type { SystemState } from "@/types";
 // Types
 // ============================================================
 
-export interface SkillGraphNode {
+interface SkillGraphNode {
     skill: string;
     category: string;
     score: number;
@@ -40,7 +40,7 @@ export interface SkillGraphNode {
     depth: number;
 }
 
-export interface SkillGraph {
+interface SkillGraph {
     roots: SkillGraphNode[];    // Top-level categories
     totalSkills: number;
     weakestPath: string[];      // E.g., ["Cybersecurity", "Cryptography", "Hashing"]
@@ -48,7 +48,7 @@ export interface SkillGraph {
     recommendations: SkillRecommendation[];
 }
 
-export interface SkillRecommendation {
+interface SkillRecommendation {
     skill: string;
     reason: string;
     priority: "high" | "medium" | "low";
@@ -158,7 +158,7 @@ export async function buildSkillGraph(userId: string): Promise<SkillGraph> {
 // FIND WEAKEST SKILL ALONG GRAPH PATH
 // ============================================================
 
-export function findWeakestSkillInGraph(graph: SkillGraph): string | null {
+function findWeakestSkillInGraph(graph: SkillGraph): string | null {
     if (graph.weakestPath.length === 0) return null;
     return graph.weakestPath[graph.weakestPath.length - 1]; // Deepest weak node
 }

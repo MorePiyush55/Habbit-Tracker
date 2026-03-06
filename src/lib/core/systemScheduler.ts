@@ -36,7 +36,7 @@ import type { SystemEventType } from "@/types";
 // Types
 // ============================================================
 
-export interface SchedulerResult {
+interface SchedulerResult {
     userId: string;
     checksRun: string[];
     eventsEmitted: string[];
@@ -44,7 +44,7 @@ export interface SchedulerResult {
     duration: number;
 }
 
-export interface BatchSchedulerResult {
+interface BatchSchedulerResult {
     totalUsers: number;
     processed: number;
     results: SchedulerResult[];
@@ -55,7 +55,7 @@ export interface BatchSchedulerResult {
 // CORE: Run all scheduled checks for a single user
 // ============================================================
 
-export async function runScheduledChecks(userId: string): Promise<SchedulerResult> {
+async function runScheduledChecks(userId: string): Promise<SchedulerResult> {
     const start = Date.now();
     const checksRun: string[] = [];
     const eventsEmitted: string[] = [];
@@ -420,7 +420,7 @@ interface AutonomousAlert {
  * Generate autonomous console alerts from scheduler results.
  * Called AFTER runScheduledChecks() to translate events into visible messages.
  */
-export async function generateAutonomousAlerts(
+async function generateAutonomousAlerts(
     userId: string,
     result: SchedulerResult
 ): Promise<AutonomousAlert[]> {

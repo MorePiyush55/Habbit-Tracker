@@ -22,7 +22,7 @@ import { storeIntervention } from "./systemMemory";
 // Types
 // ============================================================
 
-export interface InterventionDecision {
+interface InterventionDecision {
     shouldIntervene: boolean;
     level: number;                      // 0-4
     action: InterventionAction;
@@ -31,7 +31,7 @@ export interface InterventionDecision {
     escalated: boolean;                 // Did we escalate from previous level?
 }
 
-export type InterventionAction =
+type InterventionAction =
     | "NONE"
     | "WARNING"
     | "PENALTY_QUEST"

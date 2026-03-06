@@ -11,7 +11,7 @@ export function calculateXP(difficulty: Difficulty): number {
     }
 }
 
-export function calculateSubtaskXP(totalXP: number, subtaskCount: number): number {
+function calculateSubtaskXP(totalXP: number, subtaskCount: number): number {
     if (subtaskCount <= 0) return totalXP;
     return Math.floor(totalXP / subtaskCount);
 }

@@ -12,7 +12,7 @@
 // RULE DEFINITIONS
 // ============================================================
 
-export interface RuleContext {
+interface RuleContext {
     // Progress data
     completionRate: number;
     tasksCompleted: number;

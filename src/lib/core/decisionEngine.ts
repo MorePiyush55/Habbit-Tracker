@@ -23,14 +23,14 @@ import { rememberDecision } from "./systemMemory";
 // Types
 // ============================================================
 
-export interface EvaluatedDirective extends SystemDirective {
+interface EvaluatedDirective extends SystemDirective {
     confidence: number;        // 0.0 – 1.0
     reasoning: string;         // Why this directive was approved/rejected
     approved: boolean;         // Whether it passed evaluation
     originalIndex: number;     // Position in the original list
 }
 
-export interface DecisionResult {
+interface DecisionResult {
     approved: EvaluatedDirective[];
     rejected: EvaluatedDirective[];
     conflicts: string[];       // Descriptions of detected conflicts

@@ -1,6 +1,6 @@
 export type Difficulty = "small" | "medium" | "hard";
 
-export interface IUser {
+interface IUser {
     _id?: string;
     googleId: string;
     name: string;
@@ -15,7 +15,7 @@ export interface IUser {
     updatedAt: Date;
 }
 
-export interface IHabit {
+interface IHabit {
     _id?: string;
     userId: string;
     title: string;
@@ -27,14 +27,14 @@ export interface IHabit {
     createdAt: Date;
 }
 
-export interface ISubtask {
+interface ISubtask {
     _id?: string;
     habitId: string;
     title: string;
     order: number;
 }
 
-export interface IDailyProgress {
+interface IDailyProgress {
     _id?: string;
     userId: string;
     date: string; // YYYY-MM-DD
@@ -44,7 +44,7 @@ export interface IDailyProgress {
     createdAt: Date;
 }
 
-export interface IProgressEntry {
+interface IProgressEntry {
     _id?: string;
     dailyProgressId: string;
     userId: string;
@@ -55,7 +55,7 @@ export interface IProgressEntry {
     xpEarned: number;
 }
 
-export interface IAchievement {
+interface IAchievement {
     _id?: string;
     userId: string;
     title: string;
@@ -66,7 +66,7 @@ export interface IAchievement {
     unlockedAt?: Date;
 }
 
-export interface IWeeklyReport {
+interface IWeeklyReport {
     _id?: string;
     userId: string;
     week: string; // YYYY-Wnn
@@ -90,7 +90,7 @@ export interface LevelInfo {
     progress: number; // 0-100
 }
 
-export interface BossState {
+interface BossState {
     totalHP: number;
     currentHP: number;
     damageDealt: number;
@@ -230,7 +230,7 @@ export interface SystemEventPayload {
  * System Directive Types — Commands the brain produces.
  * UI, notifications, and game engine all execute these.
  */
-export type DirectiveType =
+type DirectiveType =
     | "REWARD_XP"
     | "DEDUCT_XP"
     | "GENERATE_QUEST"

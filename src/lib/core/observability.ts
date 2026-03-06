@@ -19,7 +19,7 @@ import type { MemorySnapshot } from "./systemMemory";
 // Types
 // ============================================================
 
-export interface SystemMetrics {
+interface SystemMetrics {
     // Counters (current session)
     eventsProcessed: number;
     directivesExecuted: number;
@@ -37,7 +37,7 @@ export interface SystemMetrics {
     qualityPassRate: number;      // 0-100%
 }
 
-export interface SystemHealthReport {
+interface SystemHealthReport {
     overall: "healthy" | "degraded" | "critical";
     score: number;  // 0-100
     components: {
@@ -78,7 +78,7 @@ export function trackEvent(): void {
     sessionMetrics.eventsProcessed++;
 }
 
-export function trackDirective(approved: boolean): void {
+function trackDirective(approved: boolean): void {
     if (approved) {
         sessionMetrics.directivesExecuted++;
     } else {
@@ -116,7 +116,7 @@ export function trackQualityCheck(passed: boolean): void {
 // GET: Return current session metrics
 // ============================================================
 
-export function getSessionMetrics(): SystemMetrics {
+function getSessionMetrics(): SystemMetrics {
     recalcRates();
     return { ...sessionMetrics };
 }
@@ -185,7 +185,7 @@ export function getSystemHealth(): SystemHealthReport {
 // FLUSH: Persist session metrics to System Memory (periodic)
 // ============================================================
 
-export async function flushMetrics(userId: string): Promise<void> {
+async function flushMetrics(userId: string): Promise<void> {
     try {
         if (sessionMetrics.aiCallsSuccess + sessionMetrics.aiCallsFailed > 0) {
             await incrementMetrics(userId, "totalAICalls", sessionMetrics.aiCallsSuccess + sessionMetrics.aiCallsFailed);

@@ -16,7 +16,7 @@ export function getLevelFromXP(totalXP: number): number {
     return Math.floor(totalXP / XP_PER_LEVEL) + 1;
 }
 
-export function getRankInfo(level: number): { rank: string; title: string } {
+function getRankInfo(level: number): { rank: string; title: string } {
     const tier = RANK_TIERS.find((t) => level >= t.minLevel && level <= t.maxLevel);
     return tier ? { rank: tier.rank, title: tier.title } : { rank: "E-Rank", title: "E-Rank Hunter" };
 }

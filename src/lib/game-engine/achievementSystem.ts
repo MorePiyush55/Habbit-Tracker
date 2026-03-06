@@ -7,7 +7,7 @@ interface AchievementDef {
     check: (stats: AchievementCheckData) => boolean;
 }
 
-export interface AchievementCheckData {
+interface AchievementCheckData {
     currentStreak: number;
     longestStreak: number;
     totalXP: number;
@@ -99,7 +99,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDef[] = [
     },
 ];
 
-export function checkAchievements(
+function checkAchievements(
     stats: AchievementCheckData,
     alreadyUnlocked: string[]
 ): AchievementDef[] {

@@ -257,7 +257,7 @@ export async function storeIntervention(
 // UPDATE SKILL GRAPH SNAPSHOT
 // ============================================================
 
-export async function updateSkillGraph(
+async function updateSkillGraph(
     userId: string,
     state: SystemState
 ): Promise<void> {

@@ -22,7 +22,7 @@ import { getSkillMasteryReport, formatSkillMasteryCompact, formatSkillMasteryCon
 // Types
 // ============================================================
 
-export interface AIContext {
+interface AIContext {
     compact: string;     // Short context (~500 tokens) for simple AI calls
     full: string;        // Full context (~1500 tokens) for complex reasoning
     structured: {        // Programmatic access to context pieces

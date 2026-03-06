@@ -17,7 +17,7 @@ import { analyzeBehavior, type BehaviorInsight } from "./behaviorAnalyzer";
 // Types
 // ============================================================
 
-export interface CognitiveAssessment {
+interface CognitiveAssessment {
     currentLoadHours: number;
     optimalLoadHours: number;
     capacityPercent: number;        // 0-100%, current/optimal ratio
@@ -29,7 +29,7 @@ export interface CognitiveAssessment {
     taskRecommendations: TaskRecommendation[];
 }
 
-export interface TaskRecommendation {
+interface TaskRecommendation {
     action: "keep" | "reduce" | "remove" | "prioritize";
     habitName: string;
     reason: string;

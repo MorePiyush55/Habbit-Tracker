@@ -1,4 +1,4 @@
-export class ApiError extends Error {
+class ApiError extends Error {
     statusCode: number;
 
     constructor(message: string, statusCode: number = 500) {
@@ -35,7 +35,7 @@ export function unauthorized(): Response {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-export function notFound(resource: string = "Resource"): Response {
+function notFound(resource: string = "Resource"): Response {
     return Response.json({ error: `${resource} not found` }, { status: 404 });
 }
 

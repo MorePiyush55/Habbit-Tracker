@@ -50,9 +50,9 @@ import { getSkillMasteryReport, formatSkillMasteryContext, getDecliningSkills } 
 // Types
 // ============================================================
 
-export type AgentRole = "SYSTEM" | "ANALYST" | "STRATEGIST" | "TUTOR" | "SHADOW_COACH";
+type AgentRole = "SYSTEM" | "ANALYST" | "STRATEGIST" | "TUTOR" | "SHADOW_COACH";
 
-export interface BrainV3Response {
+interface BrainV3Response {
     messages: AgentMessage[];
     directives: ConsoleDirective[];
     processingTimeMs: number;
@@ -63,7 +63,7 @@ export interface BrainV3Response {
     cognitiveConstrained: boolean;   // v3: did cognitive optimizer cap anything?
 }
 
-export interface AgentMessage {
+interface AgentMessage {
     agent: AgentRole;
     text: string;
     timestamp: string;

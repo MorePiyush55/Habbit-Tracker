@@ -20,9 +20,9 @@
 // Types
 // ============================================================
 
-export type PersonalityMode = "cold" | "balanced" | "encouraging";
+type PersonalityMode = "cold" | "balanced" | "encouraging";
 
-export interface FormattedResponse {
+interface FormattedResponse {
     text: string;
     mode: PersonalityMode;
     title: string;
@@ -102,7 +102,7 @@ export function determinePersonalityMode(
 // FORMAT: Wrap any response in System personality
 // ============================================================
 
-export function formatSystemResponse(
+function formatSystemResponse(
     rawText: string,
     context: "alert" | "warning" | "strategy" | "chat" | "training" | "commendation" | "debrief",
     mode: PersonalityMode = "cold"
@@ -145,7 +145,7 @@ export function formatSystemResponse(
 // FORMAT: System notification style
 // ============================================================
 
-export function formatSystemNotification(
+function formatSystemNotification(
     message: string,
     severity: "info" | "warning" | "critical" | "commendation"
 ): string {

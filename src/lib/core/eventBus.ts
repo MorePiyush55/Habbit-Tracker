@@ -122,7 +122,7 @@ export async function emit(event: SystemEventPayload): Promise<BrainDecisionResu
 // ============================================================
 // BATCH EMIT: Process multiple events (e.g., daily reset)
 // ============================================================
-export async function emitBatch(events: SystemEventPayload[]): Promise<(BrainDecisionResult | null)[]> {
+async function emitBatch(events: SystemEventPayload[]): Promise<(BrainDecisionResult | null)[]> {
     const results: (BrainDecisionResult | null)[] = [];
     for (const event of events) {
         results.push(await emit(event));
@@ -134,7 +134,7 @@ export async function emitBatch(events: SystemEventPayload[]): Promise<(BrainDec
 // SILENT EMIT: Process event but don't generate notifications
 // Used for internal bookkeeping events.
 // ============================================================
-export async function emitSilent(event: SystemEventPayload): Promise<void> {
+async function emitSilent(event: SystemEventPayload): Promise<void> {
     try {
         await connectDB();
         const state = await buildSystemState(event.userId);

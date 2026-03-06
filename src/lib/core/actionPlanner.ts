@@ -22,7 +22,7 @@ import HunterProfile from "@/models/HunterProfile";
 // Types
 // ============================================================
 
-export interface ActionItem {
+interface ActionItem {
     task: string;
     category: string;
     estimatedMinutes: number;
@@ -30,7 +30,7 @@ export interface ActionItem {
     reason: string;
 }
 
-export interface ActionPlan {
+interface ActionPlan {
     immediateActions: ActionItem[];     // Do RIGHT NOW
     secondaryActions: ActionItem[];     // Do after immediate
     estimatedTotalMinutes: number;
@@ -40,7 +40,7 @@ export interface ActionPlan {
     coachingQuestion?: string;          // Interactive question for the user
 }
 
-export interface HunterProfileData {
+interface HunterProfileData {
     missions: string[];
     learningProgress: { name: string; completedUnits: number; totalUnits: number; avgStudyTimeMinutes: number }[];
     weeklyTargets: { name: string; target: number; current: number }[];

@@ -17,7 +17,7 @@ import { analyzeBehavior, type BehaviorInsight } from "./behaviorAnalyzer";
 // Types
 // ============================================================
 
-export interface FutureProjection {
+interface FutureProjection {
     projectedDiscipline: number;
     projectedCompletion: number;
     projectedStreak: number;

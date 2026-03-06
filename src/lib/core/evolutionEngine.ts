@@ -24,7 +24,7 @@ import { analyzeBehavior, type BehaviorInsight } from "./behaviorAnalyzer";
 // Types
 // ============================================================
 
-export interface EvolutionRule {
+interface EvolutionRule {
     parameter: string;
     previousValue: string;
     newValue: string;
@@ -33,14 +33,14 @@ export interface EvolutionRule {
     appliedAt: string;
 }
 
-export interface EvolutionResult {
+interface EvolutionResult {
     rules: EvolutionRule[];
     totalAdjustments: number;
     nextEvaluationIn: string;   // e.g. "7 days"
     summary: string;
 }
 
-export interface StrategyParameters {
+interface StrategyParameters {
     optimalTaskTime: "morning" | "afternoon" | "evening" | "mixed";
     difficultyScaleThreshold: number;   // consecutive completions needed (default 6)
     interventionSensitivity: "low" | "medium" | "high";

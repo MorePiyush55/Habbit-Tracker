@@ -17,7 +17,7 @@
 // Types
 // ============================================================
 
-export interface QualityResult {
+interface QualityResult {
     passed: boolean;
     original: string;
     cleaned: string;
@@ -186,7 +186,7 @@ export function getFallbackResponse(context: "warning" | "commendation" | "strat
 // WRAP: Validate and auto-fallback
 // ============================================================
 
-export function validateOrFallback(
+function validateOrFallback(
     response: string,
     fallbackContext: "warning" | "commendation" | "strategy" | "notification" | "training",
     options?: {
