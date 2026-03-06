@@ -28,6 +28,8 @@ import { emit, createEvent } from "./eventBus";
 import { recallMemory, refreshWeeklyInsights, shouldRefreshWeekly, incrementMetrics } from "./systemMemory";
 import { buildSystemState } from "./systemState";
 import { generateActionPlan } from "./actionPlanner";
+import { checkDecay as checkMasteryDecay } from "./skillMasteryEngine";
+import { applyKnowledgeDecay } from "./knowledgeGraph";
 import type { SystemEventType } from "@/types";
 
 // ============================================================
@@ -317,6 +319,7 @@ async function checkSkillDecay(
 ): Promise<{ emitted: string[] }> {
     const emitted: string[] = [];
 
+    // Legacy SkillScore decay
     const skills = await SkillScore.find({ userId }).lean() as any[];
 
     for (const skill of skills) {
@@ -345,6 +348,22 @@ async function checkSkillDecay(
             emitted.push(`SKILL_DEGRADATION:${skill.skill}`);
         }
     }
+
+    // v5: SkillMastery engine decay (7-day inactivity threshold)
+    try {
+        const masteryDecay = await checkMasteryDecay(userId);
+        if (masteryDecay.totalDecayed > 0) {
+            emitted.push(`MASTERY_DECAY:${masteryDecay.decayedSkills.map(s => s.skillId).join(",")}`);
+        }
+    } catch { /* non-fatal */ }
+
+    // v5: Knowledge graph node decay (7-day inactivity)
+    try {
+        const knowledgeDecay = await applyKnowledgeDecay(userId);
+        if (knowledgeDecay.decayedCount > 0) {
+            emitted.push(`KNOWLEDGE_DECAY:${knowledgeDecay.decayedNodes.slice(0, 5).join(",")}`);
+        }
+    } catch { /* non-fatal */ }
 
     return { emitted };
 }

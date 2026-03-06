@@ -436,6 +436,18 @@ Give a 2-3 sentence motivational push. Be commanding, not friendly. Reference th
         agents: ["SYSTEM"] as AgentRole[],
         usedAI: false,
     }),
+    REQUEST_KNOWLEDGE_GRAPH: async () => ({
+        messages: [msg("SYSTEM", "Knowledge Graph is handled by Brain v3.")],
+        directives: [],
+        agents: ["SYSTEM"] as AgentRole[],
+        usedAI: false,
+    }),
+    REQUEST_MASTERY_REPORT: async () => ({
+        messages: [msg("SYSTEM", "Skill Mastery Report is handled by Brain v3.")],
+        directives: [],
+        agents: ["SYSTEM"] as AgentRole[],
+        usedAI: false,
+    }),
 };
 
 // ============================================================

@@ -43,6 +43,8 @@ import { reviewStrategy, reviewConsoleResponse } from "./shadowCoach";
 import { getAvailableCommands } from "./commandInterpreter";
 import { generateQuestion, detectWeakestSkill, getTrainingRecommendations } from "./trainingEngine";
 import { generateActionPlan, formatActionPlan } from "./actionPlanner";
+import { buildGraphSnapshot, generateLearningPath, formatGraphForContext, formatLearningPath, formatClusterDetail } from "./knowledgeGraph";
+import { getSkillMasteryReport, formatSkillMasteryContext, getDecliningSkills } from "./skillMasteryEngine";
 
 // ============================================================
 // Types
@@ -450,7 +452,7 @@ const COMMAND_HANDLERS: Record<CommandType, (
         };
     },
 
-    // ── SKILL REPORT ─────────────────────────────────────
+    // ── SKILL REPORT (v5: enhanced with mastery engine) ──
     REQUEST_SKILL_REPORT: async (cmd, state, memory, userId) => {
         const weakSkills = state.skillScores.filter((s) => s.score < 50);
         const strongSkills = state.skillScores.filter((s) => s.score >= 70);
@@ -466,6 +468,15 @@ const COMMAND_HANDLERS: Record<CommandType, (
         const formatted = formatDirective(directive, state);
         const agentMessages: AgentMessage[] = [msg("TUTOR", formatted)];
         const agents: AgentRole[] = ["TUTOR"];
+
+        // v5: Add mastery engine data
+        try {
+            const masteryReport = await getSkillMasteryReport(userId);
+            if (masteryReport.totalSkills > 0) {
+                agentMessages.push(msg("TUTOR",
+                    formatSkillMasteryContext(masteryReport)));
+            }
+        } catch { /* non-fatal */ }
 
         // v3: Tutor adds training recommendations
         if (weakSkills.length > 0) {
@@ -487,6 +498,137 @@ const COMMAND_HANDLERS: Record<CommandType, (
         return {
             messages: agentMessages,
             directives: [directive],
+            agents,
+            usedAI: false,
+        };
+    },
+
+    // ── KNOWLEDGE GRAPH ──────────────────────────────────
+    REQUEST_KNOWLEDGE_GRAPH: async (cmd, state, memory, userId) => {
+        const agentMessages: AgentMessage[] = [];
+        const agents: AgentRole[] = ["TUTOR"];
+
+        // Build graph snapshot
+        const snapshot = await buildGraphSnapshot(userId);
+
+        if (snapshot.totalNodes === 0) {
+            agentMessages.push(msg("TUTOR",
+                `KNOWLEDGE GRAPH — EMPTY\n\n` +
+                `Hunter, no knowledge nodes are tracked yet.\n\n` +
+                `Add topics to your graph via the Knowledge API or profile page.\n` +
+                `Example categories: Cybersecurity, Programming, Mathematics.\n\n` +
+                `Once populated, THE SYSTEM will:\n` +
+                `• Detect weak knowledge clusters\n` +
+                `• Generate targeted learning paths\n` +
+                `• Track mastery across connected concepts`));
+            return {
+                messages: agentMessages,
+                directives: [],
+                agents,
+                usedAI: false,
+            };
+        }
+
+        // Main graph view
+        agentMessages.push(msg("TUTOR", formatGraphForContext(snapshot)));
+
+        // Specific cluster detail if mentioned
+        const category = cmd.extractedEntities.skillName;
+        if (category) {
+            const cluster = snapshot.clusters.find((c) =>
+                c.category.toLowerCase() === category.toLowerCase()
+            );
+            if (cluster) {
+                agentMessages.push(msg("TUTOR", formatClusterDetail(cluster)));
+            }
+        }
+
+        // Learning path recommendation
+        const path = await generateLearningPath(userId, 5);
+        if (path.length > 0) {
+            agentMessages.push(msg("TUTOR", formatLearningPath(path)));
+        }
+
+        // Weak cluster warnings
+        if (snapshot.weakClusters.length > 0) {
+            agentMessages.push(msg("SHADOW_COACH",
+                `Weak clusters detected: ${snapshot.weakClusters.join(", ")}. ` +
+                `These knowledge areas need focused attention before advancing.`));
+            agents.push("SHADOW_COACH");
+        }
+
+        return {
+            messages: agentMessages,
+            directives: [],
+            agents,
+            usedAI: false,
+        };
+    },
+
+    // ── MASTERY REPORT ───────────────────────────────────
+    REQUEST_MASTERY_REPORT: async (cmd, state, memory, userId) => {
+        const agentMessages: AgentMessage[] = [];
+        const agents: AgentRole[] = ["TUTOR"];
+
+        const report = await getSkillMasteryReport(userId);
+
+        if (report.totalSkills === 0) {
+            agentMessages.push(msg("TUTOR",
+                `SKILL MASTERY — NO DATA\n\n` +
+                `Hunter, no skill mastery data exists yet.\n\n` +
+                `Mastery is tracked automatically when you:\n` +
+                `• Complete tasks linked to skills\n` +
+                `• Take training quizzes (/test)\n` +
+                `• Study consistently\n\n` +
+                `Start training to build your mastery profile.`));
+            return {
+                messages: agentMessages,
+                directives: [],
+                agents,
+                usedAI: false,
+            };
+        }
+
+        // Full mastery report
+        agentMessages.push(msg("TUTOR", formatSkillMasteryContext(report)));
+
+        // Declining skills alert
+        const declining = await getDecliningSkills(userId);
+        if (declining.length > 0) {
+            const declineList = declining.map((s) =>
+                `  ${s.name}: ${s.mastery}% (${s.daysSinceLastPractice} days inactive)`
+            ).join("\n");
+            agentMessages.push(msg("SHADOW_COACH",
+                `⚠ SKILL DECAY ALERT\n\n${declining.length} skill${declining.length > 1 ? "s" : ""} declining:\n${declineList}\n\n` +
+                `Train these immediately or mastery will continue to erode.`));
+            agents.push("SHADOW_COACH");
+        }
+
+        // Trend analysis
+        if (report.improvingCount > report.decliningCount) {
+            agentMessages.push(msg("ANALYST",
+                `Mastery trajectory: POSITIVE. ${report.improvingCount} skills improving vs ${report.decliningCount} declining. ` +
+                `Maintain current training pace.`));
+        } else if (report.decliningCount > report.improvingCount) {
+            agentMessages.push(msg("ANALYST",
+                `Mastery trajectory: NEGATIVE. ${report.decliningCount} skills declining vs ${report.improvingCount} improving. ` +
+                `Reduce scope and focus on ${report.weakestSkill?.name ?? "weakest skill"}.`));
+        }
+        agents.push("ANALYST");
+
+        // Knowledge graph cross-reference
+        try {
+            const snapshot = await buildGraphSnapshot(userId);
+            if (snapshot.totalNodes > 0 && snapshot.weakClusters.length > 0) {
+                agentMessages.push(msg("TUTOR",
+                    `Knowledge Graph: ${snapshot.weakClusters.length} weak cluster${snapshot.weakClusters.length > 1 ? "s" : ""} ` +
+                    `(${snapshot.weakClusters.join(", ")}). Cross-train these with your declining skills.`));
+            }
+        } catch { /* non-fatal */ }
+
+        return {
+            messages: agentMessages,
+            directives: [],
             agents,
             usedAI: false,
         };

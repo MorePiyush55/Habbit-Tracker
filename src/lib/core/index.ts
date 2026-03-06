@@ -3,11 +3,11 @@
  * ======================================
  * This is the central nervous system of the application.
  *
- * Architecture (v5 — Intelligent Coaching + Action Planner):
+ * Architecture (v6 — Knowledge Graph + Skill Mastery Engine):
  *
  *   User / Console / Scheduler
  *        ↓
- *   Command Interpreter (NL + 17 slash commands)
+ *   Command Interpreter (NL + 20 slash commands)
  *        ↓
  *   System Brain v3 (autonomous orchestrator)
  *        ↓
@@ -22,6 +22,7 @@
  *     • trainingEngine     • strategyGenerator
  *     • brainController    • personalityLayer
  *     • actionPlanner      • contextBuilder (profile-aware)
+ *     • knowledgeGraph     • skillMasteryEngine
  *        ↓
  *   Directive Generator → Directive Formatter
  *        ↓
@@ -29,8 +30,10 @@
  *
  *   Scheduler (autonomous) → Brain v3 autonomous events
  *   Hunter Profile → Context Builder → AI prompts
+ *   Knowledge Graph → Learning Paths → Strategy
+ *   Skill Mastery → Decay Detection → Alerts
  *
- * Total modules: 25
+ * Total modules: 27
  */
 
 // Central State
@@ -131,3 +134,11 @@ export type { CognitiveAssessment, TaskRecommendation } from "./cognitiveOptimiz
 // Action Planner — Tactical directive generator (v4)
 export { generateActionPlan, formatActionPlan } from "./actionPlanner";
 export type { ActionPlan, ActionItem, HunterProfileData } from "./actionPlanner";
+
+// Knowledge Graph — Personal Knowledge Graph (PKG)
+export { buildGraphSnapshot, generateLearningPath, getWeakClusters, upsertNode, bulkUpsertNodes, getAllNodes, getRelatedTopics, formatGraphForContext, formatLearningPath, formatClusterDetail } from "./knowledgeGraph";
+export type { KnowledgeNodeData, KnowledgeCluster, KnowledgeGraphSnapshot, LearningPathStep } from "./knowledgeGraph";
+
+// Skill Mastery Engine — Skill Mastery Tracking Engine (SMTE)
+export { getSkillMasteryReport, getWeakestSkills, getDecliningSkills, updateSkillFromTask, updateSkillFromQuiz, checkDecay, ensureSkill, formatSkillMasteryContext, formatSkillMasteryCompact } from "./skillMasteryEngine";
+export type { SkillMasteryData, SkillMasteryReport, MasteryUpdateResult, DecayCheckResult } from "./skillMasteryEngine";

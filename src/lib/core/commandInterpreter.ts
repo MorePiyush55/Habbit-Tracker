@@ -37,6 +37,8 @@ export type CommandType =
     | "REQUEST_TRAINING"
     | "REQUEST_SIMULATION"
     | "REQUEST_EVOLUTION"
+    | "REQUEST_KNOWLEDGE_GRAPH"
+    | "REQUEST_MASTERY_REPORT"
     | "FREE_CHAT";
 
 export interface SystemCommand {
@@ -256,6 +258,35 @@ const INTENT_PATTERNS: IntentPattern[] = [
         agent: "SYSTEM",
         requiresAI: false,
         confidence: 0.80,
+    },
+
+    // Knowledge Graph
+    {
+        type: "REQUEST_KNOWLEDGE_GRAPH",
+        patterns: [
+            /\b(knowledge|graph|topic|concept|cluster)\b.*\b(map|tree|graph|view|show)\b/i,
+            /\bwhat.*(know|learned|studied|topics)/i,
+            /\bknowledge.*(graph|map|tree)/i,
+            /\blearning.*(path|map|graph)/i,
+            /\bweak.*(cluster|topic|area|knowledge)/i,
+        ],
+        agent: "TUTOR",
+        requiresAI: false,
+        confidence: 0.82,
+    },
+
+    // Mastery Report
+    {
+        type: "REQUEST_MASTERY_REPORT",
+        patterns: [
+            /\b(mastery|master)\b/i,
+            /\bskill.*(mastery|level|progress|growth)/i,
+            /\bhow.*(mastered|mastery|skilled)/i,
+            /\b(decay|declining|rust).*(skill|knowledge)/i,
+        ],
+        agent: "TUTOR",
+        requiresAI: false,
+        confidence: 0.83,
     },];
 
 // ============================================================
@@ -289,6 +320,9 @@ const SLASH_COMMANDS: Record<string, {
     "/evolve":    { type: "REQUEST_EVOLUTION", agent: "SYSTEM", requiresAI: false },
     "/help":      { type: "REQUEST_HELP", agent: "SYSTEM", requiresAI: false },
     "/motivate":  { type: "REQUEST_MOTIVATION", agent: "SYSTEM", requiresAI: true },
+    "/knowledge": { type: "REQUEST_KNOWLEDGE_GRAPH", agent: "TUTOR", requiresAI: false },
+    "/graph":     { type: "REQUEST_KNOWLEDGE_GRAPH", agent: "TUTOR", requiresAI: false },
+    "/mastery":   { type: "REQUEST_MASTERY_REPORT", agent: "TUTOR", requiresAI: false },
 };
 
 export function interpretCommand(message: string): SystemCommand {
@@ -410,6 +444,9 @@ Slash Commands:
   /test       → Generate skill training question
   /evolve     → View system evolution parameters
   /motivate   → System motivational push
+  /knowledge  → Personal Knowledge Graph
+  /graph      → Knowledge cluster map
+  /mastery    → Skill mastery report with trends
   /help       → This command list
 
 Natural Language:
@@ -417,6 +454,8 @@ Natural Language:
   "How am I performing?" → Behavior analysis
   "Am I overloaded?" → Workload assessment
   "Test me on cryptography" → Skill drill
+  "Show me my knowledge graph" → Knowledge map
+  "What's my mastery?" → Skill mastery report
 
 Or ask anything — the System will respond.`;
 }

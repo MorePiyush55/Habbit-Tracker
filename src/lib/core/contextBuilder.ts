@@ -15,6 +15,8 @@ import type { SystemState } from "@/types";
 import type { MemorySnapshot } from "./systemMemory";
 import connectDB from "@/lib/mongodb";
 import HunterProfile from "@/models/HunterProfile";
+import { buildGraphSnapshot, formatGraphForContext } from "./knowledgeGraph";
+import { getSkillMasteryReport, formatSkillMasteryCompact, formatSkillMasteryContext } from "./skillMasteryEngine";
 
 // ============================================================
 // Types
@@ -29,6 +31,8 @@ export interface AIContext {
         currentHabits: string;
         behaviorSummary: string;
         skillOverview: string;
+        knowledgeGraph: string;
+        skillMastery: string;
         recentEvents: string;
         memoryInsights: string;
         activeInterventions: string;
@@ -61,6 +65,24 @@ export async function buildAIContext(
         }
     } catch { /* non-fatal */ }
 
+    // Fetch knowledge graph + skill mastery for AI context
+    let knowledgeGraph = "";
+    let skillMastery = "";
+    let skillMasteryCompact = "";
+    try {
+        const [graphSnapshot, masteryReport] = await Promise.all([
+            buildGraphSnapshot(state.hunter.userId),
+            getSkillMasteryReport(state.hunter.userId),
+        ]);
+        if (graphSnapshot.totalNodes > 0) {
+            knowledgeGraph = formatGraphForContext(graphSnapshot);
+        }
+        if (masteryReport.totalSkills > 0) {
+            skillMastery = formatSkillMasteryContext(masteryReport);
+            skillMasteryCompact = formatSkillMasteryCompact(masteryReport);
+        }
+    } catch { /* non-fatal */ }
+
     // Compact context — for simple AI calls (chat, notifications)
     const compact = `HUNTER: ${state.hunter.name} | Lv.${state.hunter.level} | ${state.hunter.hunterRank}
 Streak: ${state.hunter.streak} days | Discipline: ${state.hunter.disciplineScore}% | XP: ${state.hunter.xp}
@@ -68,6 +90,7 @@ Today: ${state.activeHabits.length} habits | ${state.weakHabits.length} weak | $
 Trend: ${state.behaviorAnalysis.trend} | Avg Completion: ${state.behaviorAnalysis.avgCompletion}%
 ${state.weakHabits.length > 0 ? `Weak: ${state.weakHabits.join(", ")}` : "No weak habits."}
 ${hunterMissions ? `Missions: ${hunterMissions.substring(0, 200)}` : ""}
+${skillMasteryCompact ? skillMasteryCompact : ""}
 ${memory?.weeklyInsights.generatedAt ? `Memory: ${memory.weeklyInsights.disciplineTrend} trend | Consistency: ${memory.weeklyInsights.consistencyScore}/100` : ""}`.trim();
 
     // Full context — for strategy, analysis, complex decisions
@@ -82,7 +105,7 @@ ${behaviorSummary}
 
 ${skillOverview}
 
-${recentEvents}
+${knowledgeGraph ? `${knowledgeGraph}\n\n` : ""}${skillMastery ? `${skillMastery}\n\n` : ""}${recentEvents}
 
 ${memoryInsights}
 
@@ -97,6 +120,8 @@ ${activeInterventions}`;
             currentHabits,
             behaviorSummary,
             skillOverview,
+            knowledgeGraph,
+            skillMastery,
             recentEvents,
             memoryInsights,
             activeInterventions,
