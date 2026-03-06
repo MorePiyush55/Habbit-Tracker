@@ -204,14 +204,15 @@ export default function Dashboard() {
                         onToggleSubtask={handleToggleSubtask}
                         loading={toggling}
                     />
+                    
+                    <div style={{ marginTop: "var(--space-xl)" }}>
+                        <DailyStrategyPanel />
+                    </div>
                 </div>
 
                 {/* Right Sidebar: System AI Controller */}
                 <div className="sidebar-right">
                     <SystemChat />
-                    <div style={{ marginTop: "var(--space-lg)" }}>
-                        <DailyStrategyPanel />
-                    </div>
                 </div>
 
                 <CreateQuestModal
