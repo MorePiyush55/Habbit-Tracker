@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Scroll, Zap } from "lucide-react";
+import { ChevronDown, Scroll, Zap, Trash2 } from "lucide-react";
 
 interface Subtask {
     _id: string;
@@ -26,10 +26,11 @@ interface QuestPanelProps {
     quests: Quest[];
     date: string;
     onToggleSubtask: (habitId: string, subtaskId: string, completed: boolean) => void;
+    onDeleteQuest?: (habitId: string) => void;
     loading: boolean;
 }
 
-export default function QuestPanel({ quests, date, onToggleSubtask, loading }: QuestPanelProps) {
+export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQuest, loading }: QuestPanelProps) {
     const [expandedQuests, setExpandedQuests] = useState<Set<string>>(new Set());
 
     const toggleExpand = (questId: string) => {
@@ -93,12 +94,48 @@ export default function QuestPanel({ quests, date, onToggleSubtask, loading }: Q
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    className={`quest-expand ${isExpanded ? "open" : ""}`}
-                                    aria-label="Toggle subtasks"
-                                >
-                                    <ChevronDown size={20} />
-                                </button>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    {onDeleteQuest && (
+                                        <button
+                                            className="quest-delete-btn"
+                                            aria-label="Delete quest"
+                                            title="Delete quest"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (window.confirm(`Delete "${quest.title}"? This cannot be undone.`)) {
+                                                    onDeleteQuest(quest._id);
+                                                }
+                                            }}
+                                            style={{
+                                                background: "none",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                padding: 4,
+                                                borderRadius: 6,
+                                                color: "var(--text-muted)",
+                                                transition: "color 0.2s, background 0.2s",
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.color = "#ef4444";
+                                                e.currentTarget.style.background = "rgba(239,68,68,0.1)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.color = "var(--text-muted)";
+                                                e.currentTarget.style.background = "none";
+                                            }}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                    <button
+                                        className={`quest-expand ${isExpanded ? "open" : ""}`}
+                                        aria-label="Toggle subtasks"
+                                    >
+                                        <ChevronDown size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Mini progress bar */}

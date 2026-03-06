@@ -93,6 +93,20 @@ export default function TasksPage() {
         setToggling(false);
     };
 
+    const handleDeleteQuest = async (habitId: string) => {
+        // Optimistic removal
+        setQuests((prev) => prev.filter((q) => q._id !== habitId));
+        try {
+            const res = await fetch(`/api/habits/${habitId}`, { method: "DELETE" });
+            if (!res.ok) {
+                // Revert on failure
+                await fetchQuests();
+            }
+        } catch {
+            await fetchQuests();
+        }
+    };
+
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
     const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
 
@@ -182,6 +196,7 @@ export default function TasksPage() {
                         quests={quests}
                         date={today}
                         onToggleSubtask={handleToggleSubtask}
+                        onDeleteQuest={handleDeleteQuest}
                         loading={toggling}
                     />
                 </div>
