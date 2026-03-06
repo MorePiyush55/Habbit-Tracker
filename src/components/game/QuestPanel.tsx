@@ -152,9 +152,7 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                             title="Delete quest"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (window.confirm(`Delete "${quest.title}"? This cannot be undone.`)) {
-                                                    onDeleteQuest(quest._id);
-                                                }
+                                                onDeleteQuest(quest._id);
                                             }}
                                             style={{
                                                 background: "none",
