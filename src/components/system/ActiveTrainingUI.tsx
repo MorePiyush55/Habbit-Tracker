@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Zap, X, ChevronRight, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 interface TrainingQuiz {
@@ -34,27 +34,25 @@ export default function ActiveTrainingUI() {
     const [loading, setLoading] = useState(false);
     const [grading, setGrading] = useState(false);
 
-    // Auto-trigger training logic
-    useEffect(() => {
-        const checkTraining = async () => {
-            try {
-                const res = await fetch("/api/system/test-user", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "generate" })
-                });
-                const data = await res.json();
-                if (data.quiz) {
-                    setQuiz(data.quiz);
-                    setIsOpen(true);
-                }
-            } catch (err) {
-                console.error("Failed to fetch training", err);
+    const startTraining = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/system/test-user", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "generate" })
+            });
+            const data = await res.json();
+            if (data.quiz) {
+                setQuiz(data.quiz);
+                setIsOpen(true);
             }
-        };
-
-        checkTraining();
-    }, []);
+        } catch (err) {
+            console.error("Failed to fetch training", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSubmitAnswer = async () => {
         if (!answerReq.trim() || !quiz) return;
@@ -116,9 +114,24 @@ export default function ActiveTrainingUI() {
 
     if (!isOpen) {
         return (
-            <button className="btn btn-secondary" onClick={fetchDebrief} style={{ width: "100%", marginTop: "var(--space-md)", borderColor: "var(--accent-red)", color: "var(--accent-red)" }}>
-                <Zap size={16} /> Force Nightly Debrief
-            </button>
+            <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
+                <button
+                    className="btn btn-primary"
+                    onClick={startTraining}
+                    disabled={loading}
+                    style={{ flex: 1 }}
+                >
+                    {loading ? <Loader2 size={16} className="spinning" /> : <><Zap size={16} /> Active Training</>}
+                </button>
+                <button
+                    className="btn btn-secondary"
+                    onClick={fetchDebrief}
+                    disabled={loading}
+                    style={{ flex: 1, borderColor: "var(--accent-red)", color: "var(--accent-red)" }}
+                >
+                    {loading ? <Loader2 size={16} className="spinning" /> : "Nightly Debrief"}
+                </button>
+            </div>
         );
     }
 
