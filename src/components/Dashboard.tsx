@@ -6,6 +6,7 @@ import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
 import StreakDisplay from "@/components/game/StreakDisplay";
+import CreateQuestModal from "@/components/game/CreateQuestModal";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AIInsightsPanel from "@/components/ai/AIInsightsPanel";
 import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
@@ -41,6 +42,7 @@ export default function Dashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -167,6 +169,16 @@ export default function Dashboard() {
             {/* Main Content */}
             <div className="main-content">
                 <BossBattle date={today} entries={bossEntries} />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "-10px" }}>
+                    <h2 className="section-title" style={{ margin: 0 }}>
+                        <span className="section-title-icon">📜</span> TODAY'S QUESTS
+                    </h2>
+                    <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                        + Add Quest
+                    </button>
+                </div>
+
                 <QuestPanel
                     quests={quests}
                     date={today}
@@ -180,6 +192,12 @@ export default function Dashboard() {
             <div className="sidebar-right">
                 <AIInsightsPanel />
             </div>
+
+            <CreateQuestModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onQuestCreated={fetchProgress}
+            />
         </div>
     );
 }

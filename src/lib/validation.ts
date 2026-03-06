@@ -7,6 +7,7 @@ export const habitSchema = z.object({
     xpReward: z.number().min(1).max(100),
     order: z.number().optional(),
     isActive: z.boolean().optional(),
+    subtasks: z.array(z.string()).optional(),
 });
 
 export const subtaskSchema = z.object({
