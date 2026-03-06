@@ -7,7 +7,7 @@ const MODELS = {
     fast: "meta-llama/llama-3.1-8b-instruct:free",      // Chat, notifications
     reason: "deepseek/deepseek-r1:free",                  // Analysis, strategy
     tutor: "google/gemma-3-27b-it:free",                  // Learning, quizzes
-    fallback: "qwen/qwen-2.5-7b-instruct:free",           // Universal fallback
+    fallback: "mistralai/mistral-7b-instruct:free",       // Universal fallback
 };
 
 async function callModel(model: string, prompt: string): Promise<string> {
