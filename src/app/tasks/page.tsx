@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import QuestPanel from "@/components/game/QuestPanel";
 import type { Quest } from "@/components/game/QuestPanel";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
@@ -12,7 +11,6 @@ import { ListChecks } from "lucide-react";
 
 export default function TasksPage() {
     const { data: session, status } = useSession();
-    const router = useRouter();
     const [quests, setQuests] = useState<Quest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -21,11 +19,6 @@ export default function TasksPage() {
     const pendingToggles = useRef(0);
 
     const today = new Date().toISOString().split("T")[0];
-
-    // Redirect to login if not authenticated
-    useEffect(() => {
-        if (status === "unauthenticated") router.push("/");
-    }, [status, router]);
 
     const fetchQuests = useCallback(async () => {
         try {

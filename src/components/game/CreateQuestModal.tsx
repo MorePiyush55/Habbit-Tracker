@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
+import useSWR from "swr";
 import { X, Plus, Trash2 } from "lucide-react";
+
+const goalsFetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface Goal {
     _id: string;
@@ -18,40 +21,31 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("");
     const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">("medium");
-    const [subtasks, setSubtasks] = useState<string[]>([""]);
+    const subtaskIdRef = useRef(1);
+    const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>([{id: 0, text: ""}]);
     const [deadline, setDeadline] = useState("");
     const [linkedGoalId, setLinkedGoalId] = useState("");
     const [isDaily, setIsDaily] = useState(true);
-    const [availableGoals, setAvailableGoals] = useState<Goal[]>([]);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    useEffect(() => {
-        if (isOpen) {
-            fetch("/api/goals")
-                .then(res => res.json())
-                .then(data => {
-                    if (data.goals) setAvailableGoals(data.goals);
-                })
-                .catch(err => console.error("Error fetching goals:", err));
-        }
-    }, [isOpen]);
+    // Fetch goals via SWR (only when modal is open)
+    const { data: goalsData } = useSWR(isOpen ? "/api/goals" : null, goalsFetcher);
+    const availableGoals: Goal[] = goalsData?.goals || [];
 
     if (!isOpen) return null;
 
     const handleAddSubtask = () => {
-        setSubtasks([...subtasks, ""]);
+        setSubtasks(prev => [...prev, {id: subtaskIdRef.current++, text: ""}]);
     };
 
-    const handleSubtaskChange = (index: number, value: string) => {
-        const newSubtasks = [...subtasks];
-        newSubtasks[index] = value;
-        setSubtasks(newSubtasks);
+    const handleSubtaskChange = (id: number, value: string) => {
+        setSubtasks(prev => prev.map(s => s.id === id ? {...s, text: value} : s));
     };
 
-    const handleRemoveSubtask = (index: number) => {
-        setSubtasks(subtasks.filter((_, i) => i !== index));
+    const handleRemoveSubtask = (id: number) => {
+        setSubtasks(prev => prev.filter(s => s.id !== id));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -60,7 +54,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
         setError("");
 
         try {
-            const validSubtasks = subtasks.filter(s => s.trim() !== "");
+            const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
             const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
 
             const payload: any = {
@@ -90,7 +84,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             setTitle("");
             setCategory("");
             setDifficulty("medium");
-            setSubtasks([""]);
+            subtaskIdRef.current = 1;
+            setSubtasks([{id: 0, text: ""}]);
             setDeadline("");
             setLinkedGoalId("");
 
@@ -104,8 +99,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content glass-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose} onKeyDown={e => e.key === 'Escape' && onClose()}>
+            <div className="modal-content glass-card" role="document" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2 className="section-title" style={{ margin: 0 }}>CREATE DAILY TASK</h2>
                     <button className="icon-btn" onClick={onClose}><X size={20} /></button>
@@ -115,8 +110,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
                 <form onSubmit={handleSubmit} className="quest-form">
                     <div className="form-group">
-                        <label>Quest Title</label>
+                        <label htmlFor="create-quest-title">Quest Title</label>
                         <input
+                            id="create-quest-title"
                             type="text"
                             required
                             value={title}
@@ -128,8 +124,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                         <div className="form-group">
-                            <label>Category</label>
+                            <label htmlFor="create-quest-category">Category</label>
                             <input
+                                id="create-quest-category"
                                 type="text"
                                 required
                                 value={category}
@@ -140,8 +137,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         </div>
 
                         <div className="form-group">
-                            <label>Difficulty</label>
+                            <label htmlFor="create-quest-difficulty">Difficulty</label>
                             <select
+                                id="create-quest-difficulty"
                                 value={difficulty}
                                 onChange={e => setDifficulty(e.target.value as any)}
                                 className="game-input"
@@ -155,7 +153,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                         <div className="form-group">
-                            <label>Schedule</label>
+                            <span style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>Schedule</span>
                             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
                                 <input
                                     type="checkbox"
@@ -169,8 +167,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
                         {!isDaily && (
                             <div className="form-group">
-                                <label>Deadline (One-Time Task)</label>
+                                <label htmlFor="create-quest-deadline">Deadline (One-Time Task)</label>
                                 <input
+                                    id="create-quest-deadline"
                                     type="date"
                                     value={deadline}
                                     onChange={e => setDeadline(e.target.value)}
@@ -181,8 +180,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         )}
 
                         <div className="form-group" style={{ gridColumn: isDaily ? "1 / -1" : "auto" }}>
-                            <label>Link to Goal (Optional)</label>
+                            <label htmlFor="create-quest-goal">Link to Goal (Optional)</label>
                             <select
+                                id="create-quest-goal"
                                 value={linkedGoalId}
                                 onChange={e => setLinkedGoalId(e.target.value)}
                                 className="game-input"
@@ -196,24 +196,24 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                     </div>
 
                     <div className="form-group">
-                        <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 500 }}>
                             Subtasks
                             <button type="button" onClick={handleAddSubtask} className="text-btn">
                                 <Plus size={14} /> Add Step
                             </button>
-                        </label>
+                        </span>
                         <div className="subtasks-list">
-                            {subtasks.map((subtask, index) => (
-                                <div key={index} className="subtask-input-row">
+                            {subtasks.map((subtask) => (
+                                <div key={subtask.id} className="subtask-input-row">
                                     <input
                                         type="text"
-                                        value={subtask}
-                                        onChange={e => handleSubtaskChange(index, e.target.value)}
-                                        placeholder={`Step ${index + 1}`}
+                                        value={subtask.text}
+                                        onChange={e => handleSubtaskChange(subtask.id, e.target.value)}
+                                        placeholder="Step"
                                         className="game-input"
                                     />
                                     {subtasks.length > 1 && (
-                                        <button type="button" onClick={() => handleRemoveSubtask(index)} className="icon-btn danger">
+                                        <button type="button" onClick={() => handleRemoveSubtask(subtask.id)} className="icon-btn danger">
                                             <Trash2 size={16} />
                                         </button>
                                     )}

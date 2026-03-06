@@ -35,4 +35,5 @@ export async function connectDB(): Promise<typeof mongoose> {
   return cached.conn;
 }
 
+// Default export for backward compatibility (named export is preferred)
 export default connectDB;

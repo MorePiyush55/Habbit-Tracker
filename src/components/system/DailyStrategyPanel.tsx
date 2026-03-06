@@ -229,7 +229,7 @@ export default function DailyStrategyPanel() {
                                             )}
                                             {quest.subtasks.length > 0 && (
                                                 <ul style={{ margin: "6px 0 0 0", padding: "0 0 0 16px", fontSize: "0.75rem", color: "#aaa" }}>
-                                                    {quest.subtasks.map((s, i) => <li key={i}>{s}</li>)}
+                                                    {quest.subtasks.map(s => <li key={`${quest._id}-${s}`}>{s}</li>)}
                                                 </ul>
                                             )}
                                         </div>

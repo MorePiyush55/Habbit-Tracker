@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
+import useSWR from "swr";
 import Link from "next/link";
 import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
@@ -13,6 +14,8 @@ import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AppNav from "@/components/AppNav";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface Subtask {
     _id: string;
@@ -35,79 +38,54 @@ interface Quest {
 
 export default function Dashboard() {
     const { data: session } = useSession();
-    const [quests, setQuests] = useState<Quest[]>([]);
-    const [userStats, setUserStats] = useState({
-        totalXP: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        level: 1,
-        disciplineScore: 50,
-        focusScore: 50,
-        skillGrowthScore: 50,
-        hunterRank: "E-Class",
-        weeklyBossHP: 500,
-        bossDefeatedThisWeek: false,
-    });
-    const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const today = new Date().toISOString().split("T")[0];
 
-    const fetchProgress = useCallback(async () => {
-        try {
-            const res = await fetch(`/api/progress?date=${today}`);
-            if (res.ok) {
-                const data = await res.json();
-                setQuests(data.habits || []);
-            }
+    const { data: progressData, isLoading: progressLoading, mutate: mutateProgress } = useSWR(
+        `/api/progress?date=${today}`,
+        fetcher,
+        { refreshInterval: 30000 }
+    );
 
-            // Fetch user stats
-            const statsRes = await fetch("/api/analytics?days=1");
-            if (statsRes.ok) {
-                const statsData = await statsRes.json();
-                if (statsData.user) {
-                    setUserStats({
-                        totalXP: statsData.user.totalXP || 0,
-                        currentStreak: statsData.user.currentStreak || 0,
-                        longestStreak: statsData.user.longestStreak || 0,
-                        level: statsData.user.level || 1,
-                        disciplineScore: statsData.user.disciplineScore || 50,
-                        focusScore: statsData.user.focusScore || 50,
-                        skillGrowthScore: statsData.user.skillGrowthScore || 50,
-                        hunterRank: statsData.user.hunterRank || "E-Class",
-                        weeklyBossHP: statsData.user.weeklyBossHP || 500,
-                        bossDefeatedThisWeek: statsData.user.bossDefeatedThisWeek || false,
-                    });
-                }
-            }
-        } catch (error) {
-            console.error("Failed to fetch progress:", error);
+    const { data: statsData } = useSWR("/api/analytics?days=1", fetcher, { refreshInterval: 30000 });
+
+    const quests: Quest[] = progressData?.habits || [];
+    const userStats = {
+        totalXP: statsData?.user?.totalXP || 0,
+        currentStreak: statsData?.user?.currentStreak || 0,
+        longestStreak: statsData?.user?.longestStreak || 0,
+        level: statsData?.user?.level || 1,
+        disciplineScore: statsData?.user?.disciplineScore || 50,
+        focusScore: statsData?.user?.focusScore || 50,
+        skillGrowthScore: statsData?.user?.skillGrowthScore || 50,
+        hunterRank: statsData?.user?.hunterRank || "E-Class",
+        weeklyBossHP: statsData?.user?.weeklyBossHP || 500,
+        bossDefeatedThisWeek: statsData?.user?.bossDefeatedThisWeek || false,
+    };
+    const loading = progressLoading;
+
+    // Emit SESSION_START once on mount via ref (not in useEffect)
+    const sessionStartRef = useRef(false);
+    if (!sessionStartRef.current) {
+        sessionStartRef.current = true;
+        if (typeof window !== "undefined") {
+            fetch("/api/system/process-event", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ eventType: "SESSION_START" }),
+            }).catch(() => {/* non-blocking */});
         }
-        setLoading(false);
-    }, [today]);
-
-    useEffect(() => {
-        fetchProgress();
-
-        // Emit SESSION_START event into the AI Discipline OS
-        fetch("/api/system/process-event", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventType: "SESSION_START" }),
-        }).catch(() => {/* non-blocking */});
-
-        // Poll every 30 seconds
-        const interval = setInterval(fetchProgress, 30000);
-        return () => clearInterval(interval);
-    }, [fetchProgress]);
+    }
 
     const handleToggleSubtask = async (habitId: string, subtaskId: string, completed: boolean) => {
         setToggling(true);
 
         // Optimistic update
-        setQuests((prev) =>
-            prev.map((q) => {
+        const optimisticData = {
+            ...progressData,
+            habits: quests.map((q) => {
                 if (q._id !== habitId) return q;
                 const updatedSubtasks = q.subtasks.map((s) =>
                     s._id === subtaskId ? { ...s, completed } : s
@@ -120,24 +98,21 @@ export default function Dashboard() {
                     completionPercent: Math.round((completedCount / totalCount) * 100),
                     isFullyCompleted: completedCount === totalCount,
                 };
-            })
-        );
+            }),
+        };
+        mutateProgress(optimisticData, false);
 
         try {
-            const res = await fetch("/api/progress", {
+            await fetch("/api/progress", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ habitId, subtaskId, completed, date: today }),
             });
-
-            if (res.ok) {
-                // Refresh to get accurate server state
-                await fetchProgress();
-            }
+            // Revalidate from server
+            mutateProgress();
         } catch (error) {
             console.error("Failed to toggle subtask:", error);
-            // Revert on failure
-            await fetchProgress();
+            mutateProgress();
         }
         setToggling(false);
     };
@@ -204,7 +179,7 @@ export default function Dashboard() {
                 <CreateQuestModal
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
-                    onQuestCreated={fetchProgress}
+                    onQuestCreated={() => mutateProgress()}
                 />
             </div>
         </div>

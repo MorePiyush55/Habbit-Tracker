@@ -78,7 +78,7 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                             className={`quest-item glass-card ${quest.isFullyCompleted ? "completed" : ""}`}
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
-                            <div className="quest-header" onClick={() => quest.subtasks.length > 0 ? toggleExpand(quest._id) : undefined}>
+                            <div className="quest-header" role="button" tabIndex={0} onClick={() => quest.subtasks.length > 0 ? toggleExpand(quest._id) : undefined} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && quest.subtasks.length > 0) { e.preventDefault(); toggleExpand(quest._id); } }}>
                                 <div className="quest-info" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     {/* Main task checkbox for quests with no subtasks */}
                                     {quest.subtasks.length === 0 && onToggleMainTask && (

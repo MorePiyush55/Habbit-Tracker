@@ -2,6 +2,7 @@
 
 import { getLevelInfo } from "@/lib/game-engine/levelSystem";
 import { getStreakInfo } from "@/lib/game-engine/streakSystem";
+import Image from "next/image";
 import { Flame, Zap, TrendingUp, Award } from "lucide-react";
 
 interface PlayerStatsProps {
@@ -29,7 +30,7 @@ export default function PlayerStats({
     return (
         <div className="glass-card player-card">
             {photo ? (
-                <img src={photo} alt={name} className="player-avatar" />
+                <Image src={photo} alt={name} width={80} height={80} className="player-avatar" />
             ) : (
                 <div
                     className="player-avatar"

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import useSWR from "swr";
 import { Send, ShieldAlert, Zap, AlertTriangle } from "lucide-react";
+
+const chatFetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface ChatMessage {
     _id: string;
@@ -17,17 +20,14 @@ export default function SystemChat() {
     const [statusText, setStatusText] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Fetch history
+    // Fetch history via SWR
+    const { data: chatData } = useSWR("/api/system/chat", chatFetcher, { revalidateOnFocus: false });
+
     useEffect(() => {
-        fetch("/api/system/chat")
-            .then(res => res.json())
-            .then(data => {
-                if (data.messages && data.messages.length > 0) {
-                    setMessages(data.messages);
-                }
-            })
-            .catch(err => console.error("Error fetching chat:", err));
-    }, []);
+        if (chatData?.messages && chatData.messages.length > 0 && messages.length === 0) {
+            setMessages(chatData.messages);
+        }
+    }, [chatData, messages.length]);
 
     // Scroll to bottom
     useEffect(() => {

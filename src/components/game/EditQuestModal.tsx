@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { Quest } from "./QuestPanel";
 
@@ -16,9 +16,10 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
     const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">(
         quest.difficulty as "small" | "medium" | "hard"
     );
-    const [subtasks, setSubtasks] = useState<string[]>(
+    const subtaskIdRef = useRef(quest.subtasks.length);
+    const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>(
         quest.subtasks.length > 0
-            ? quest.subtasks.map((s) => s.title)
+            ? quest.subtasks.map((s, idx) => ({id: idx, text: s.title}))
             : []
     );
 
@@ -26,17 +27,15 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
     const [error, setError] = useState("");
 
     const handleAddSubtask = () => {
-        setSubtasks([...subtasks, ""]);
+        setSubtasks(prev => [...prev, {id: subtaskIdRef.current++, text: ""}]);
     };
 
-    const handleSubtaskChange = (index: number, value: string) => {
-        const newSubtasks = [...subtasks];
-        newSubtasks[index] = value;
-        setSubtasks(newSubtasks);
+    const handleSubtaskChange = (id: number, value: string) => {
+        setSubtasks(prev => prev.map(s => s.id === id ? {...s, text: value} : s));
     };
 
-    const handleRemoveSubtask = (index: number) => {
-        setSubtasks(subtasks.filter((_, i) => i !== index));
+    const handleRemoveSubtask = (id: number) => {
+        setSubtasks(prev => prev.filter(s => s.id !== id));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +45,7 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
 
         try {
             const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
-            const validSubtasks = subtasks.filter((s) => s.trim() !== "");
+            const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
 
             const payload: Record<string, unknown> = {
                 title,
@@ -77,8 +76,8 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content glass-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose} onKeyDown={e => e.key === 'Escape' && onClose()}>
+            <div className="modal-content glass-card" role="document" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2 className="section-title" style={{ margin: 0 }}>EDIT QUEST</h2>
                     <button className="icon-btn" onClick={onClose}>
@@ -97,8 +96,9 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
 
                 <form onSubmit={handleSubmit} className="quest-form">
                     <div className="form-group">
-                        <label>Quest Title</label>
+                        <label htmlFor="edit-quest-title">Quest Title</label>
                         <input
+                            id="edit-quest-title"
                             type="text"
                             required
                             value={title}
@@ -110,8 +110,9 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                         <div className="form-group">
-                            <label>Category</label>
+                            <label htmlFor="edit-quest-category">Category</label>
                             <input
+                                id="edit-quest-category"
                                 type="text"
                                 required
                                 value={category}
@@ -122,8 +123,9 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                         </div>
 
                         <div className="form-group">
-                            <label>Difficulty</label>
+                            <label htmlFor="edit-quest-difficulty">Difficulty</label>
                             <select
+                                id="edit-quest-difficulty"
                                 value={difficulty}
                                 onChange={(e) => setDifficulty(e.target.value as "small" | "medium" | "hard")}
                                 className="game-input"
@@ -136,30 +138,30 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                     </div>
 
                     <div className="form-group">
-                        <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 500 }}>
                             Subtasks
                             <button type="button" onClick={handleAddSubtask} className="text-btn">
                                 <Plus size={14} /> Add Step
                             </button>
-                        </label>
+                        </span>
                         {subtasks.length === 0 && (
                             <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: "4px 0" }}>
                                 No subtasks — task will show a direct checkbox.
                             </p>
                         )}
                         <div className="subtasks-list">
-                            {subtasks.map((subtask, index) => (
-                                <div key={index} className="subtask-input-row">
+                            {subtasks.map((subtask) => (
+                                <div key={subtask.id} className="subtask-input-row">
                                     <input
                                         type="text"
-                                        value={subtask}
-                                        onChange={(e) => handleSubtaskChange(index, e.target.value)}
-                                        placeholder={`Step ${index + 1}`}
+                                        value={subtask.text}
+                                        onChange={(e) => handleSubtaskChange(subtask.id, e.target.value)}
+                                        placeholder="Step"
                                         className="game-input"
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => handleRemoveSubtask(index)}
+                                        onClick={() => handleRemoveSubtask(subtask.id)}
                                         className="icon-btn danger"
                                     >
                                         <Trash2 size={16} />

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import useSWR from "swr";
 import {
     Send, ShieldAlert, Zap, AlertTriangle,
     Brain, BarChart3, Target, GraduationCap, Eye,
     Terminal, Loader2
 } from "lucide-react";
+
+const chatFetcher = (url: string) => fetch(url).then(res => res.json());
 
 // ============================================================
 // Types
@@ -93,91 +96,62 @@ export default function SystemConsole() {
     const [activeAgents, setActiveAgents] = useState<AgentRole[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const initialLoadDone = useRef(false);
 
-    // Load history on mount
-    useEffect(() => {
-        fetch("/api/system/chat")
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.messages && data.messages.length > 0) {
-                    const converted = data.messages.map((m: any) => {
-                        // Parse agent from [AGENT] prefix in content
-                        let agent: AgentRole = "SYSTEM";
-                        let content = m.content || "";
-                        const agentMatch = content.match(/^\[(SYSTEM|ANALYST|STRATEGIST|TUTOR|SHADOW_COACH)\]\s*/);
-                        if (agentMatch) {
-                            agent = agentMatch[1] as AgentRole;
-                            content = content.replace(agentMatch[0], "");
-                        }
-
-                        return {
-                            id: m._id || Date.now().toString(),
-                            role: m.role === "user" ? "user" as const : "agent" as const,
-                            agent: m.role === "user" ? undefined : agent,
-                            content,
-                            timestamp: m.timestamp || new Date().toISOString(),
-                            autonomous: m.metadata?.autonomous || false,
-                        };
-                    });
-                    setMessages(converted);
-                }
-            })
-            .catch((err) => console.error("Error fetching console history:", err));
+    // Convert raw API messages to ConsoleMessage format
+    const parseMessages = useCallback((rawMessages: any[]): ConsoleMessage[] => {
+        return rawMessages.map((m: any) => {
+            let agent: AgentRole = "SYSTEM";
+            let content = m.content || "";
+            const agentMatch = content.match(/^\[(SYSTEM|ANALYST|STRATEGIST|TUTOR|SHADOW_COACH)\]\s*/);
+            if (agentMatch) {
+                agent = agentMatch[1] as AgentRole;
+                content = content.replace(agentMatch[0], "");
+            }
+            return {
+                id: m._id || Date.now().toString(),
+                role: m.role === "user" ? "user" as const : "agent" as const,
+                agent: m.role === "user" ? undefined : agent,
+                content,
+                timestamp: m.timestamp || new Date().toISOString(),
+            };
+        });
     }, []);
 
-    // Poll for autonomous system alerts every 60 seconds
+    // SWR for chat history + autonomous polling
+    const { data: chatData } = useSWR("/api/system/chat", chatFetcher, {
+        refreshInterval: 60000,
+        revalidateOnFocus: false,
+    });
+
+    // Initial load from SWR
     useEffect(() => {
-        const pollInterval = setInterval(() => {
-            if (loading) return; // Don't poll while sending
+        if (chatData?.messages && chatData.messages.length > 0 && !initialLoadDone.current) {
+            initialLoadDone.current = true;
+            setMessages(parseMessages(chatData.messages));
+        }
+    }, [chatData, parseMessages]);
 
-            const lastTimestamp = messages.length > 0
-                ? messages[messages.length - 1].timestamp
-                : new Date(Date.now() - 60000).toISOString();
+    // Check for autonomous alerts from new SWR data
+    useEffect(() => {
+        if (!chatData?.messages || !initialLoadDone.current || loading) return;
 
-            fetch(`/api/system/chat`)
-                .then((res) => res.json())
-                .then((data) => {
-                    if (!data.messages) return;
+        const existingIds = new Set(messages.map(m => m.id));
+        const newAutonomous = chatData.messages
+            .filter((m: any) => !existingIds.has(m._id) && m.metadata?.autonomous);
 
-                    // Find messages newer than our latest
-                    const existingIds = new Set(messages.map((m) => m.id));
-                    const newMessages = data.messages
-                        .filter((m: any) => !existingIds.has(m._id) && m.metadata?.autonomous)
-                        .map((m: any) => {
-                            let agent: AgentRole = "SYSTEM";
-                            let content = m.content || "";
-                            const agentMatch = content.match(/^\[(SYSTEM|ANALYST|STRATEGIST|TUTOR|SHADOW_COACH)\]\s*/);
-                            if (agentMatch) {
-                                agent = agentMatch[1] as AgentRole;
-                                content = content.replace(agentMatch[0], "");
-                            }
-                            return {
-                                id: m._id,
-                                role: "agent" as const,
-                                agent,
-                                content,
-                                timestamp: m.timestamp,
-                                autonomous: true,
-                            };
-                        });
-
-                    if (newMessages.length > 0) {
-                        setMessages((prev) => [...prev, ...newMessages]);
-                        // Flash active agents
-                        const agents = newMessages
-                            .map((m: ConsoleMessage & { autonomous?: boolean }) => m.agent)
-                            .filter((a: AgentRole | undefined): a is AgentRole => !!a && !activeAgents.includes(a));
-                        if (agents.length > 0) {
-                            setActiveAgents((prev) => [...new Set([...prev, ...agents])]);
-                        }
-                    }
-                })
-                .catch(() => { /* silent */ });
-        }, 60000);
-
-        return () => clearInterval(pollInterval);
+        if (newAutonomous.length > 0) {
+            const parsed = parseMessages(newAutonomous);
+            setMessages(prev => [...prev, ...parsed]);
+            const agents = parsed
+                .map(m => m.agent)
+                .filter((a): a is AgentRole => !!a && !activeAgents.includes(a));
+            if (agents.length > 0) {
+                setActiveAgents(prev => [...new Set([...prev, ...agents])]);
+            }
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [messages.length, loading]);
+    }, [chatData]);
 
     // Auto-scroll
     useEffect(() => {
@@ -425,7 +399,7 @@ export default function SystemConsole() {
                                         fontSize: "0.75rem",
                                         fontWeight: 600,
                                         cursor: "pointer",
-                                        transition: "all 0.2s",
+                                        transition: "border-color 0.2s, color 0.2s",
                                         letterSpacing: "0.5px",
                                     }}
                                     onMouseEnter={(e) => {

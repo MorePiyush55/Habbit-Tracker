@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import AppNav from "@/components/AppNav";
 import {
     Target, BookOpen, Briefcase, Brain, Clock, AlertTriangle,
     Eye, Save, Plus, Trash2, ArrowLeft, Shield
 } from "lucide-react";
 
+const profileFetcher = (url: string) => fetch(url).then(res => res.json());
+
 interface LearningProgress {
+    _uid: string;
     name: string;
     completedUnits: number;
     totalUnits: number;
@@ -17,6 +21,7 @@ interface LearningProgress {
 }
 
 interface WeeklyTarget {
+    _uid: string;
     name: string;
     target: number;
     current: number;
@@ -59,38 +64,39 @@ export default function ProfilePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [profile, setProfile] = useState<HunterProfile>(DEFAULT_PROFILE);
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [profileLoaded, setProfileLoaded] = useState(false);
+    const uidRef = useRef(0);
+    const nextUid = () => `uid-${uidRef.current++}`;
 
     // Temp inputs for adding items
     const [newSkillName, setNewSkillName] = useState("");
     const [newSkipTask, setNewSkipTask] = useState("");
     const [newVision, setNewVision] = useState("");
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/");
-        }
-    }, [status, router]);
+    // Fetch profile via SWR
+    const { data: profileData, isLoading } = useSWR(
+        status === "authenticated" ? "/api/hunter-profile" : null,
+        profileFetcher,
+        { revalidateOnFocus: false }
+    );
 
     useEffect(() => {
-        fetch("/api/hunter-profile")
-            .then(res => res.json())
-            .then(data => {
-                if (data.profile) {
-                    setProfile({
-                        ...DEFAULT_PROFILE,
-                        ...data.profile,
-                        missions: data.profile.missions?.length > 0
-                            ? [...data.profile.missions, ...Array(Math.max(0, 3 - data.profile.missions.length)).fill("")]
-                            : ["", "", ""],
-                    });
-                }
-                setLoading(false);
-            })
-            .catch(() => setLoading(false));
-    }, []);
+        if (profileData?.profile && !profileLoaded) {
+            setProfileLoaded(true);
+            const p = profileData.profile;
+            setProfile({
+                ...DEFAULT_PROFILE,
+                ...p,
+                missions: p.missions?.length > 0
+                    ? [...p.missions, ...Array(Math.max(0, 3 - p.missions.length)).fill("")]
+                    : ["", "", ""],
+                learningProgress: (p.learningProgress || []).map((lp: Omit<LearningProgress, '_uid'>) => ({ ...lp, _uid: nextUid() })),
+                weeklyTargets: (p.weeklyTargets || []).map((wt: Omit<WeeklyTarget, '_uid'>) => ({ ...wt, _uid: nextUid() })),
+            });
+        }
+    }, [profileData, profileLoaded]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -101,6 +107,8 @@ export default function ProfilePage() {
                 missions: profile.missions.filter(m => m.trim()),
                 sixMonthVision: profile.sixMonthVision.filter(v => v.trim()),
                 frequentlySkippedTasks: profile.frequentlySkippedTasks.filter(t => t.trim()),
+                learningProgress: profile.learningProgress.map(({ _uid, ...rest }) => rest),
+                weeklyTargets: profile.weeklyTargets.map(({ _uid, ...rest }) => rest),
             };
 
             const res = await fetch("/api/hunter-profile", {
@@ -124,14 +132,14 @@ export default function ProfilePage() {
     const addLearningProgress = () => {
         setProfile(p => ({
             ...p,
-            learningProgress: [...p.learningProgress, { name: "", completedUnits: 0, totalUnits: 1, avgStudyTimeMinutes: 60 }],
+            learningProgress: [...p.learningProgress, { _uid: nextUid(), name: "", completedUnits: 0, totalUnits: 1, avgStudyTimeMinutes: 60 }],
         }));
     };
 
     const addWeeklyTarget = () => {
         setProfile(p => ({
             ...p,
-            weeklyTargets: [...p.weeklyTargets, { name: "", target: 5, current: 0 }],
+            weeklyTargets: [...p.weeklyTargets, { _uid: nextUid(), name: "", target: 5, current: 0 }],
         }));
     };
 
@@ -162,7 +170,7 @@ export default function ProfilePage() {
         setNewVision("");
     };
 
-    if (status === "loading" || loading) {
+    if (status === "loading" || isLoading) {
         return (
             <div className="loading-spinner" style={{ minHeight: "100vh" }}>
                 <div className="spinner" />
@@ -210,15 +218,15 @@ export default function ProfilePage() {
                     <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0 0 var(--space-md) 0" }}>
                         What are your primary objectives right now?
                     </p>
-                    {profile.missions.slice(0, 3).map((mission, i) => (
+                    {[0, 1, 2].map(slot => (
                         <input
-                            key={i}
+                            key={`mission-slot-${slot}`}
                             className="game-input"
-                            placeholder={`Mission ${i + 1} (e.g. Pass CompTIA Security+)`}
-                            value={mission}
+                            placeholder={`Mission ${slot + 1} (e.g. Pass CompTIA Security+)`}
+                            value={profile.missions[slot] || ""}
                             onChange={e => {
                                 const updated = [...profile.missions];
-                                updated[i] = e.target.value;
+                                updated[slot] = e.target.value;
                                 setProfile(p => ({ ...p, missions: updated }));
                             }}
                             style={{ marginBottom: "var(--space-sm)", width: "100%" }}
@@ -235,16 +243,20 @@ export default function ProfilePage() {
                     <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0 0 var(--space-md) 0" }}>
                         Courses, certifications, or study programs you&apos;re working through.
                     </p>
-                    {profile.learningProgress.map((lp, i) => (
-                        <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
+                    {profile.learningProgress.map((lp) => (
+                        <div key={lp._uid} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
                             <input
                                 className="game-input"
                                 placeholder="Course name"
                                 value={lp.name}
                                 onChange={e => {
-                                    const updated = [...profile.learningProgress];
-                                    updated[i] = { ...lp, name: e.target.value };
-                                    setProfile(p => ({ ...p, learningProgress: updated }));
+                                    const uid = lp._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        learningProgress: p.learningProgress.map(item =>
+                                            item._uid === uid ? { ...item, name: e.target.value } : item
+                                        ),
+                                    }));
                                 }}
                             />
                             <input
@@ -253,9 +265,13 @@ export default function ProfilePage() {
                                 placeholder="Done"
                                 value={lp.completedUnits}
                                 onChange={e => {
-                                    const updated = [...profile.learningProgress];
-                                    updated[i] = { ...lp, completedUnits: parseInt(e.target.value) || 0 };
-                                    setProfile(p => ({ ...p, learningProgress: updated }));
+                                    const uid = lp._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        learningProgress: p.learningProgress.map(item =>
+                                            item._uid === uid ? { ...item, completedUnits: parseInt(e.target.value) || 0 } : item
+                                        ),
+                                    }));
                                 }}
                                 style={{ textAlign: "center" }}
                             />
@@ -265,9 +281,13 @@ export default function ProfilePage() {
                                 placeholder="Total"
                                 value={lp.totalUnits}
                                 onChange={e => {
-                                    const updated = [...profile.learningProgress];
-                                    updated[i] = { ...lp, totalUnits: parseInt(e.target.value) || 1 };
-                                    setProfile(p => ({ ...p, learningProgress: updated }));
+                                    const uid = lp._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        learningProgress: p.learningProgress.map(item =>
+                                            item._uid === uid ? { ...item, totalUnits: parseInt(e.target.value) || 1 } : item
+                                        ),
+                                    }));
                                 }}
                                 style={{ textAlign: "center" }}
                             />
@@ -277,17 +297,21 @@ export default function ProfilePage() {
                                 placeholder="min/day"
                                 value={lp.avgStudyTimeMinutes}
                                 onChange={e => {
-                                    const updated = [...profile.learningProgress];
-                                    updated[i] = { ...lp, avgStudyTimeMinutes: parseInt(e.target.value) || 0 };
-                                    setProfile(p => ({ ...p, learningProgress: updated }));
+                                    const uid = lp._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        learningProgress: p.learningProgress.map(item =>
+                                            item._uid === uid ? { ...item, avgStudyTimeMinutes: parseInt(e.target.value) || 0 } : item
+                                        ),
+                                    }));
                                 }}
                                 style={{ textAlign: "center" }}
                             />
                             <button
                                 className="btn-ghost"
                                 onClick={() => {
-                                    const updated = profile.learningProgress.filter((_, idx) => idx !== i);
-                                    setProfile(p => ({ ...p, learningProgress: updated }));
+                                    const uid = lp._uid;
+                                    setProfile(p => ({ ...p, learningProgress: p.learningProgress.filter(item => item._uid !== uid) }));
                                 }}
                                 style={{ padding: 4, color: "var(--accent-red)" }}
                             >
@@ -314,16 +338,20 @@ export default function ProfilePage() {
                     <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0 0 var(--space-md) 0" }}>
                         Recurring weekly goals (e.g. job applications, client outreach).
                     </p>
-                    {profile.weeklyTargets.map((wt, i) => (
-                        <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
+                    {profile.weeklyTargets.map((wt) => (
+                        <div key={wt._uid} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
                             <input
                                 className="game-input"
                                 placeholder="Target name"
                                 value={wt.name}
                                 onChange={e => {
-                                    const updated = [...profile.weeklyTargets];
-                                    updated[i] = { ...wt, name: e.target.value };
-                                    setProfile(p => ({ ...p, weeklyTargets: updated }));
+                                    const uid = wt._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        weeklyTargets: p.weeklyTargets.map(item =>
+                                            item._uid === uid ? { ...item, name: e.target.value } : item
+                                        ),
+                                    }));
                                 }}
                             />
                             <input
@@ -332,9 +360,13 @@ export default function ProfilePage() {
                                 placeholder="Goal"
                                 value={wt.target}
                                 onChange={e => {
-                                    const updated = [...profile.weeklyTargets];
-                                    updated[i] = { ...wt, target: parseInt(e.target.value) || 0 };
-                                    setProfile(p => ({ ...p, weeklyTargets: updated }));
+                                    const uid = wt._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        weeklyTargets: p.weeklyTargets.map(item =>
+                                            item._uid === uid ? { ...item, target: parseInt(e.target.value) || 0 } : item
+                                        ),
+                                    }));
                                 }}
                                 style={{ textAlign: "center" }}
                             />
@@ -344,15 +376,22 @@ export default function ProfilePage() {
                                 placeholder="Done"
                                 value={wt.current}
                                 onChange={e => {
-                                    const updated = [...profile.weeklyTargets];
-                                    updated[i] = { ...wt, current: parseInt(e.target.value) || 0 };
-                                    setProfile(p => ({ ...p, weeklyTargets: updated }));
+                                    const uid = wt._uid;
+                                    setProfile(p => ({
+                                        ...p,
+                                        weeklyTargets: p.weeklyTargets.map(item =>
+                                            item._uid === uid ? { ...item, current: parseInt(e.target.value) || 0 } : item
+                                        ),
+                                    }));
                                 }}
                                 style={{ textAlign: "center" }}
                             />
                             <button
                                 className="btn-ghost"
-                                onClick={() => setProfile(p => ({ ...p, weeklyTargets: p.weeklyTargets.filter((_, idx) => idx !== i) }))}
+                                onClick={() => {
+                                    const uid = wt._uid;
+                                    setProfile(p => ({ ...p, weeklyTargets: p.weeklyTargets.filter(item => item._uid !== uid) }));
+                                }}
                                 style={{ padding: 4, color: "var(--accent-red)" }}
                             >
                                 <Trash2 size={16} />
@@ -374,7 +413,7 @@ export default function ProfilePage() {
                         Rate your current skill levels (0-100). The System uses this for training recommendations.
                     </p>
                     {profile.skillRatings.map((sr, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+                        <div key={`sr-${sr.name}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
                             <span style={{ minWidth: 120, fontSize: "0.9rem", color: "var(--text-secondary)" }}>{sr.name}</span>
                             <input
                                 type="range"
@@ -423,10 +462,11 @@ export default function ProfilePage() {
                     </h2>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
                         <div>
-                            <label style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+                            <label htmlFor="profile-daily-hours" style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
                                 Daily Available Hours
                             </label>
                             <input
+                                id="profile-daily-hours"
                                 className="game-input"
                                 type="number"
                                 min={0.5}
@@ -438,10 +478,11 @@ export default function ProfilePage() {
                             />
                         </div>
                         <div>
-                            <label style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+                            <label htmlFor="profile-focus-time" style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
                                 Best Focus Time
                             </label>
                             <select
+                                id="profile-focus-time"
                                 className="game-input"
                                 value={profile.bestFocusTime}
                                 onChange={e => setProfile(p => ({ ...p, bestFocusTime: e.target.value }))}
@@ -466,7 +507,7 @@ export default function ProfilePage() {
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
                         {profile.frequentlySkippedTasks.map((task, i) => (
-                            <span key={i} style={{
+                            <span key={`skip-${task}`} style={{
                                 display: "inline-flex", alignItems: "center", gap: 4,
                                 padding: "4px 10px", borderRadius: 6, fontSize: "0.85rem",
                                 background: "rgba(239, 68, 68, 0.15)", color: "var(--accent-red)", border: "1px solid rgba(239, 68, 68, 0.3)"
@@ -540,7 +581,7 @@ export default function ProfilePage() {
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
                         {profile.sixMonthVision.map((v, i) => (
-                            <span key={i} style={{
+                            <span key={`vision-${v}`} style={{
                                 display: "inline-flex", alignItems: "center", gap: 4,
                                 padding: "4px 10px", borderRadius: 6, fontSize: "0.85rem",
                                 background: "rgba(59, 130, 246, 0.15)", color: "var(--accent-blue)", border: "1px solid rgba(59, 130, 246, 0.3)"

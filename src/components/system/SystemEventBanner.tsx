@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
+import useSWR from "swr";
 import { ShieldAlert, X, AlertTriangle, Award, Skull, TrendingDown, Zap } from "lucide-react";
 
 interface SystemEvent {
@@ -32,33 +33,20 @@ const eventColors: Record<string, string> = {
 };
 
 export default function SystemEventBanner() {
-    const [events, setEvents] = useState<SystemEvent[]>([]);
-    const [visible, setVisible] = useState(true);
+    const [dismissed, setDismissed] = useState(false);
 
-    // Poll for unread events every 15 seconds
-    useEffect(() => {
-        const fetchEvents = async () => {
-            try {
-                const res = await fetch("/api/system/events?unread=true");
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.events && data.events.length > 0) {
-                        setEvents(data.events);
-                        setVisible(true);
-                    }
-                }
-            } catch (err) {
-                // Silently ignore polling failures
-            }
-        };
-
-        fetchEvents();
-        const interval = setInterval(fetchEvents, 15000);
-        return () => clearInterval(interval);
+    const fetcher = useCallback(async (url: string) => {
+        const res = await fetch(url);
+        if (!res.ok) return { events: [] };
+        return res.json();
     }, []);
 
+    const { data, mutate } = useSWR("/api/system/events?unread=true", fetcher, { refreshInterval: 15000 });
+    const events: SystemEvent[] = data?.events || [];
+    const visible = !dismissed && events.length > 0;
+
     const dismissAll = async () => {
-        setVisible(false);
+        setDismissed(true);
 
         try {
             await fetch("/api/system/events", {
@@ -66,14 +54,15 @@ export default function SystemEventBanner() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ eventIds: events.map(e => e._id) })
             });
-            setEvents([]);
+            mutate({ events: [] }, false);
         } catch (err) {
             console.error("Failed to mark events as read:", err);
         }
     };
 
     const dismissOne = async (eventId: string) => {
-        setEvents(prev => prev.filter(e => e._id !== eventId));
+        const remaining = events.filter(e => e._id !== eventId);
+        mutate({ events: remaining }, false);
 
         try {
             await fetch("/api/system/events", {
