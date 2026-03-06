@@ -170,13 +170,6 @@ export default function Dashboard() {
                         hunterRank={userStats.hunterRank}
                     />
 
-                    {/* Weekly Boss Raid */}
-                    <BossBattle
-                        bossHP={userStats.weeklyBossHP}
-                        isDefeated={userStats.bossDefeatedThisWeek}
-                        currentStreak={userStats.currentStreak}
-                    />
-
                     {/* Active Training — above achievements */}
                     <ActiveTrainingUI />
 
@@ -188,28 +181,12 @@ export default function Dashboard() {
                     {/* System Chat */}
                     <SystemChat />
 
-                    {/* Quest Summary + link to /tasks */}
-                    <div className="glass-card" style={{ padding: "var(--space-lg)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-md)" }}>
-                            <div className="section-title" style={{ margin: 0 }}>
-                                <span style={{ color: "var(--accent-blue)" }}>◈</span> Daily Quests
-                            </div>
-                            <div style={{ display: "flex", gap: 8 }}>
-                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                                    + Add Quest
-                                </button>
-                                <Link href="/tasks" className="btn btn-secondary" style={{ textDecoration: "none" }}>
-                                    View All →
-                                </Link>
-                            </div>
-                        </div>
-                        <QuestPanel
-                            quests={quests}
-                            date={today}
-                            onToggleSubtask={handleToggleSubtask}
-                            loading={toggling}
-                        />
-                    </div>
+                    {/* Weekly Boss Raid — back in main column */}
+                    <BossBattle
+                        bossHP={userStats.weeklyBossHP}
+                        isDefeated={userStats.bossDefeatedThisWeek}
+                        currentStreak={userStats.currentStreak}
+                    />
 
                     {/* Daily Strategy */}
                     <DailyStrategyPanel />
