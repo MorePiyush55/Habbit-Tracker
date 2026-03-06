@@ -157,7 +157,7 @@ export default function Dashboard() {
         <>
             <SystemEventBanner />
             <div className="dashboard-grid">
-                {/* Left Sidebar */}
+                {/* ── LEFT SIDEBAR ── */}
                 <div className="sidebar-left">
                     <PlayerStats
                         name={user?.name || "Hunter"}
@@ -173,44 +173,52 @@ export default function Dashboard() {
                         longestStreak={userStats.longestStreak}
                     />
                     <AchievementBadges unlockedIds={[]} />
+
+                    {/* Training & Debrief Actions */}
+                    <ActiveTrainingUI />
+
                     <button
                         className="btn btn-secondary"
                         onClick={() => signOut()}
-                        style={{ width: "100%" }}
+                        style={{ width: "100%", opacity: 0.6, fontSize: "0.8rem" }}
                         id="sign-out-btn"
                     >
-                        <LogOut size={16} />
+                        <LogOut size={14} />
                         Sign Out
                     </button>
                 </div>
 
-                {/* Main Content */}
+                {/* ── MAIN CONTENT ── */}
                 <div className="main-content">
-                    {/* System AI Controller moved to top of main content */}
+                    {/* ROW 1: System Chat — full width */}
                     <SystemChat />
 
-                    <BossBattle
-                        bossHP={userStats.weeklyBossHP}
-                        isDefeated={userStats.bossDefeatedThisWeek}
-                        currentStreak={userStats.currentStreak}
-                    />
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "-10px" }}>
-                        <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                            + Add Daily Task
-                        </button>
+                    {/* ROW 2: Boss Battle (left) + Quests (right) */}
+                    <div className="boss-quest-row">
+                        <div className="boss-col">
+                            <BossBattle
+                                bossHP={userStats.weeklyBossHP}
+                                isDefeated={userStats.bossDefeatedThisWeek}
+                                currentStreak={userStats.currentStreak}
+                            />
+                        </div>
+                        <div className="quest-col">
+                            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-md)" }}>
+                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                                    + Add Daily Task
+                                </button>
+                            </div>
+                            <QuestPanel
+                                quests={quests}
+                                date={today}
+                                onToggleSubtask={handleToggleSubtask}
+                                loading={toggling}
+                            />
+                        </div>
                     </div>
 
-                    <QuestPanel
-                        quests={quests}
-                        date={today}
-                        onToggleSubtask={handleToggleSubtask}
-                        loading={toggling}
-                    />
-
-                    <div style={{ marginTop: "var(--space-xl)" }}>
-                        <DailyStrategyPanel />
-                    </div>
+                    {/* ROW 3: Daily Strategy — full width */}
+                    <DailyStrategyPanel />
                 </div>
 
                 <CreateQuestModal
@@ -218,8 +226,6 @@ export default function Dashboard() {
                     onClose={() => setIsCreateModalOpen(false)}
                     onQuestCreated={fetchProgress}
                 />
-
-                <ActiveTrainingUI />
             </div>
         </>
     );

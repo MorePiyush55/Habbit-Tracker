@@ -446,33 +446,69 @@ body::before {
 /* ========== LAYOUT ========== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--space-lg);
-  max-width: 1200px;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: var(--space-lg);
+  padding: 20px;
   min-height: 100vh;
   position: relative;
   z-index: 1;
+  align-items: start;
 }
 
 .sidebar-left {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: 14px;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+.sidebar-left::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-left::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 2px;
 }
 
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: 16px;
+  min-width: 0;
 }
 
-.sidebar-right {
+/* Boss Battle + Quest Panel side-by-side row */
+.boss-quest-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.boss-col {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
 }
+
+.quest-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 
 /* ========== HEADINGS ========== */
 .section-title {
@@ -1387,25 +1423,34 @@ body::before {
 }
 
 /* ========== RESPONSIVE ========== */
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .dashboard-grid {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 260px 1fr;
+    gap: 14px;
+    padding: 14px;
   }
 }
 
 @media (max-width: 768px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
-    padding: var(--space-md);
-    gap: var(--space-md);
+    padding: 12px;
+    gap: 12px;
   }
 
   .sidebar-left {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
     order: 1;
   }
 
   .main-content {
     order: 2;
+  }
+
+  .boss-quest-row {
+    grid-template-columns: 1fr;
   }
 
   .login-title {
@@ -1419,7 +1464,8 @@ body::before {
 
 @media (max-width: 480px) {
   .dashboard-grid {
-    padding: var(--space-sm);
+    padding: 8px;
+    gap: 8px;
   }
 
   .stat-grid {
