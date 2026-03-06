@@ -48,4 +48,4 @@ export function getStreakInfo(currentStreak: number, longestStreak: number): Str
     };
 }
 
-export { STREAK_MILESTONES };
+// STREAK_MILESTONES used internally

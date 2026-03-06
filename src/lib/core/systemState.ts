@@ -208,7 +208,7 @@ export async function buildSystemState(userId: string, date?: string): Promise<S
  * Get a lightweight state snapshot (no DB calls for behavior logs).
  * Used for quick rule evaluations where full state isn't needed.
  */
-export async function getQuickState(userId: string): Promise<Pick<
+async function getQuickState(userId: string): Promise<Pick<
     SystemState,
     "hunter" | "activeHabits" | "weakHabits" | "strongHabits" | "bossRaid"
 >> {

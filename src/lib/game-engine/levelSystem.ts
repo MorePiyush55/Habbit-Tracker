@@ -40,4 +40,4 @@ export function getLevelInfo(totalXP: number): LevelInfo {
     };
 }
 
-export { RANK_TIERS, XP_PER_LEVEL };
+// RANK_TIERS and XP_PER_LEVEL used internally

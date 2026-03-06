@@ -506,7 +506,7 @@ async function translateEventToAlert(
  * Get autonomous alerts that haven't been seen yet.
  * Used by the console to poll for new system-initiated messages.
  */
-export async function getUnseenAlerts(
+async function getUnseenAlerts(
     userId: string,
     since: Date
 ): Promise<AutonomousAlert[]> {

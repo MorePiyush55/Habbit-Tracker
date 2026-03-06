@@ -400,9 +400,9 @@ function checkMemoryConflicts(
 // DECISION ROUTING: Choose rule vs AI vs cache
 // ============================================================
 
-export type DecisionPath = "rule" | "ai" | "cache";
+type DecisionPath = "rule" | "ai" | "cache";
 
-export interface RoutingDecision {
+interface RoutingDecision {
     path: DecisionPath;
     reason: string;
     confidence: number;
@@ -412,7 +412,7 @@ export interface RoutingDecision {
  * Determines whether a command/directive should be handled by
  * rule engine, AI, or cached response.
  */
-export function routeDecision(
+function routeDecision(
     directiveType: string,
     memory: MemorySnapshot | null
 ): RoutingDecision {

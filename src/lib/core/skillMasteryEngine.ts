@@ -127,7 +127,7 @@ export async function ensureSkill(
 }
 
 /** Get all active skills for a user */
-export async function getAllSkills(userId: string): Promise<SkillMasteryData[]> {
+async function getAllSkills(userId: string): Promise<SkillMasteryData[]> {
     await connectDB();
     const docs = await SkillMastery.find({ userId, isActive: true })
         .sort({ mastery: 1 })
