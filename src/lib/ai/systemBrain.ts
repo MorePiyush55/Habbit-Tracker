@@ -530,6 +530,6 @@ Respond as The System. Plain text only. No JSON. No markdown.`;
         return { reply: text.replace(/```[\s\S]*?```/g, "").trim() };
     } catch (e: any) {
         console.error("[System Brain SYSTEM_CHAT Error]:", e.message);
-        return { reply: "⚠ SYSTEM NOTICE\n\nSystem malfunction detected.\nRetry your request." };
+        return { reply: `⚠ SYSTEM NOTICE\n\nSystem malfunction detected.\nERROR: ${e.message}\nRetry your request.` };
     }
 }

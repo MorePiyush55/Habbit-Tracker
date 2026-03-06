@@ -104,9 +104,18 @@ Return ONLY valid JSON:
                 }
             } catch (err: any) {
                 console.error("[Test User] Generation failed:", err.message);
+                // Return the exact error as the fallback question for immediate Vercel diagnosis
+                return Response.json({
+                    quiz: {
+                        topic: "SYSTEM ERROR",
+                        question: `API Generation Failed. Please show this error to the system architect: ${err.message}`,
+                        difficulty: "hard",
+                        hint: "Vercel / Gemini Integration Failure"
+                    }
+                });
             }
 
-            // Fallback
+            // Fallback if parsing fails but no error thrown
             return Response.json({
                 quiz: {
                     topic: targetSkill,
