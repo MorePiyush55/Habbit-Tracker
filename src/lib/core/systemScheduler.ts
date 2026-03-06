@@ -11,6 +11,11 @@
  *   - WEEKLY_INSIGHT_REFRESH: Update memory weekly insights
  *   - STRATEGY_PREGENERATION: Pre-generate tomorrow's strategy
  *
+ * Autonomous Console Messages:
+ *   The scheduler now writes SYSTEM-initiated messages directly into
+ *   the chat history so they appear in the System Console as autonomous
+ *   alerts from different agents.
+ *
  * Trigger via: /api/cron/system-check or external cron service
  */
 
@@ -18,6 +23,7 @@ import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import BehaviorLog from "@/models/BehaviorLog";
 import SkillScore from "@/models/SkillScore";
+import SystemMessage from "@/models/SystemMessage";
 import { emit, createEvent } from "./eventBus";
 import { recallMemory, refreshWeeklyInsights, shouldRefreshWeekly, incrementMetrics } from "./systemMemory";
 import { buildSystemState } from "./systemState";
@@ -109,13 +115,24 @@ export async function runScheduledChecks(userId: string): Promise<SchedulerResul
         errors.push(`SCHEDULER_GLOBAL: ${e.message}`);
     }
 
-    return {
+    const result: SchedulerResult = {
         userId,
         checksRun,
         eventsEmitted,
         errors,
         duration: Date.now() - start,
     };
+
+    // Generate autonomous console alerts from emitted events
+    if (eventsEmitted.length > 0) {
+        try {
+            await generateAutonomousAlerts(userId, result);
+        } catch {
+            // Non-fatal: alerts are bonus, not critical
+        }
+    }
+
+    return result;
 }
 
 // ============================================================
@@ -313,4 +330,116 @@ async function checkStreakRisk(
     }
 
     return { emitted: false };
+}
+// ============================================================
+// AUTONOMOUS CONSOLE MESSAGES
+// ============================================================
+// These functions write System-initiated messages into the chat
+// history so they appear as autonomous alerts in the Console.
+
+type AutoAgent = "SYSTEM" | "ANALYST" | "STRATEGIST" | "TUTOR" | "SHADOW_COACH";
+
+interface AutonomousAlert {
+    agent: AutoAgent;
+    text: string;
+}
+
+/**
+ * Generate autonomous console alerts from scheduler results.
+ * Called AFTER runScheduledChecks() to translate events into visible messages.
+ */
+export async function generateAutonomousAlerts(
+    userId: string,
+    result: SchedulerResult
+): Promise<AutonomousAlert[]> {
+    const alerts: AutonomousAlert[] = [];
+
+    for (const event of result.eventsEmitted) {
+        const alert = translateEventToAlert(event, result);
+        if (alert) alerts.push(alert);
+    }
+
+    // Persist to chat history
+    for (const alert of alerts) {
+        try {
+            await SystemMessage.create({
+                userId,
+                role: "system",
+                content: `[${alert.agent}] ${alert.text}`,
+                metadata: { autonomous: true, agent: alert.agent },
+            });
+        } catch {
+            // Non-fatal
+        }
+    }
+
+    return alerts;
+}
+
+function translateEventToAlert(
+    eventType: string,
+    result: SchedulerResult
+): AutonomousAlert | null {
+    switch (eventType) {
+        case "INACTIVITY":
+            return {
+                agent: "SYSTEM",
+                text: "⚠ SYSTEM ALERT\n\nHunter.\n\nYou have been inactive. Your training stalls.\n\nResume your quests immediately.",
+            };
+
+        case "WEAK_PROGRESS":
+            return {
+                agent: "ANALYST",
+                text: "📊 BEHAVIOR ANALYSIS\n\nCompletion rate has dropped critically this week.\n\nRecommendation: reduce task difficulty and focus on core habits only.\n\nThis decline, if unchecked, will compound.",
+            };
+
+        case "DISCIPLINE_IMPROVEMENT":
+            return {
+                agent: "SYSTEM",
+                text: "✦ DISCIPLINE UPGRADE DETECTED\n\nHunter.\n\nYour performance trend is improving. The System acknowledges your effort.\n\nMaintain this trajectory.",
+            };
+
+        case "STREAK_MILESTONE":
+            return {
+                agent: "SHADOW_COACH",
+                text: "⚠ STREAK AT RISK\n\nYour streak is in danger.\n\nComplete at least one task before midnight to preserve it.\n\nDon't waste what you've built.",
+            };
+
+        default:
+            // Handle SKILL_DEGRADATION:skillName
+            if (eventType.startsWith("SKILL_DEGRADATION:")) {
+                const skill = eventType.split(":")[1];
+                return {
+                    agent: "TUTOR",
+                    text: `📉 SKILL DECAY DETECTED\n\nYour ${skill} skill is degrading from disuse.\n\nRecommendation: Complete a practice session or test in this area within 48 hours.`,
+                };
+            }
+            return null;
+    }
+}
+
+/**
+ * Get autonomous alerts that haven't been seen yet.
+ * Used by the console to poll for new system-initiated messages.
+ */
+export async function getUnseenAlerts(
+    userId: string,
+    since: Date
+): Promise<AutonomousAlert[]> {
+    await connectDB();
+
+    const messages = await SystemMessage.find({
+        userId,
+        role: "system",
+        "metadata.autonomous": true,
+        timestamp: { $gt: since },
+    })
+        .sort({ timestamp: 1 })
+        .limit(10)
+        .lean() as any[];
+
+    return messages.map((m) => ({
+        agent: (m.metadata?.agent || "SYSTEM") as AutoAgent,
+        text: m.content.replace(/^\[[A-Z_]+\]\s*/, ""), // Strip agent prefix
+    }));
 }

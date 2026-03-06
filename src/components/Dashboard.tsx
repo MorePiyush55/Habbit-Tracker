@@ -7,7 +7,7 @@ import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
-import SystemChat from "@/components/system/SystemChat";
+import SystemConsole from "@/components/system/SystemConsole";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
@@ -195,8 +195,10 @@ export default function Dashboard() {
                     {/* 2. Daily Strategy — MIDDLE */}
                     <DailyStrategyPanel />
 
-                    {/* 3. System Chat — BOTTOM */}
-                    <SystemChat />
+                    {/* 3. System Console — BOTTOM */}
+                    <div style={{ height: "500px" }}>
+                        <SystemConsole />
+                    </div>
                 </div>
 
                 <CreateQuestModal

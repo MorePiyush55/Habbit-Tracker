@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckSquare, LogOut } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Terminal, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 export default function AppNav() {
@@ -22,6 +22,10 @@ export default function AppNav() {
                 <Link href="/tasks" className={`nav-link ${pathname === "/tasks" ? "active" : ""}`}>
                     <CheckSquare size={16} />
                     Tasks
+                </Link>
+                <Link href="/console" className={`nav-link ${pathname === "/console" ? "active" : ""}`}>
+                    <Terminal size={16} />
+                    System Console
                 </Link>
             </div>
             <button

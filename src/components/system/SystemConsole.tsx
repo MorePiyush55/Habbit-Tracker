@@ -100,18 +100,84 @@ export default function SystemConsole() {
             .then((res) => res.json())
             .then((data) => {
                 if (data.messages && data.messages.length > 0) {
-                    const converted = data.messages.map((m: any) => ({
-                        id: m._id || Date.now().toString(),
-                        role: m.role === "user" ? "user" as const : "agent" as const,
-                        agent: m.role === "user" ? undefined : ("SYSTEM" as AgentRole),
-                        content: m.content,
-                        timestamp: m.timestamp || new Date().toISOString(),
-                    }));
+                    const converted = data.messages.map((m: any) => {
+                        // Parse agent from [AGENT] prefix in content
+                        let agent: AgentRole = "SYSTEM";
+                        let content = m.content || "";
+                        const agentMatch = content.match(/^\[(SYSTEM|ANALYST|STRATEGIST|TUTOR|SHADOW_COACH)\]\s*/);
+                        if (agentMatch) {
+                            agent = agentMatch[1] as AgentRole;
+                            content = content.replace(agentMatch[0], "");
+                        }
+
+                        return {
+                            id: m._id || Date.now().toString(),
+                            role: m.role === "user" ? "user" as const : "agent" as const,
+                            agent: m.role === "user" ? undefined : agent,
+                            content,
+                            timestamp: m.timestamp || new Date().toISOString(),
+                            autonomous: m.metadata?.autonomous || false,
+                        };
+                    });
                     setMessages(converted);
                 }
             })
             .catch((err) => console.error("Error fetching console history:", err));
     }, []);
+
+    // Poll for autonomous system alerts every 60 seconds
+    useEffect(() => {
+        const pollInterval = setInterval(() => {
+            if (loading) return; // Don't poll while sending
+
+            const lastTimestamp = messages.length > 0
+                ? messages[messages.length - 1].timestamp
+                : new Date(Date.now() - 60000).toISOString();
+
+            fetch(`/api/system/chat`)
+                .then((res) => res.json())
+                .then((data) => {
+                    if (!data.messages) return;
+
+                    // Find messages newer than our latest
+                    const existingIds = new Set(messages.map((m) => m.id));
+                    const newMessages = data.messages
+                        .filter((m: any) => !existingIds.has(m._id) && m.metadata?.autonomous)
+                        .map((m: any) => {
+                            let agent: AgentRole = "SYSTEM";
+                            let content = m.content || "";
+                            const agentMatch = content.match(/^\[(SYSTEM|ANALYST|STRATEGIST|TUTOR|SHADOW_COACH)\]\s*/);
+                            if (agentMatch) {
+                                agent = agentMatch[1] as AgentRole;
+                                content = content.replace(agentMatch[0], "");
+                            }
+                            return {
+                                id: m._id,
+                                role: "agent" as const,
+                                agent,
+                                content,
+                                timestamp: m.timestamp,
+                                autonomous: true,
+                            };
+                        });
+
+                    if (newMessages.length > 0) {
+                        setMessages((prev) => [...prev, ...newMessages]);
+                        // Flash active agents
+                        const agents = newMessages
+                            .map((m: ConsoleMessage & { autonomous?: boolean }) => m.agent)
+                            .filter((a: AgentRole | undefined): a is AgentRole => !!a && !activeAgents.includes(a));
+                        if (agents.length > 0) {
+                            setActiveAgents((prev) => [...new Set([...prev, ...agents])]);
+                        }
+                    }
+                })
+                .catch(() => { /* silent */ });
+        }, 60000);
+
+        return () => clearInterval(pollInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages.length, loading]);
 
     // Auto-scroll
     useEffect(() => {

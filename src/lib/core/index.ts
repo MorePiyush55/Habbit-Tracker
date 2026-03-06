@@ -100,7 +100,7 @@ export { trackEvent, trackDirective, trackAICall, trackQualityCheck, getSessionM
 export type { SystemMetrics, SystemHealthReport } from "./observability";
 
 // Scheduler — Autonomous mode
-export { runScheduledChecks, runBatchScheduledChecks } from "./systemScheduler";
+export { runScheduledChecks, runBatchScheduledChecks, generateAutonomousAlerts, getUnseenAlerts } from "./systemScheduler";
 export type { SchedulerResult, BatchSchedulerResult } from "./systemScheduler";
 
 // Evolution Engine — AI self-improvement
