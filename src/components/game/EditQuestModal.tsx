@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar } from "lucide-react";
 import type { Quest } from "./QuestPanel";
 
 interface EditQuestModalProps {
@@ -15,6 +15,19 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
     const [category, setCategory] = useState(quest.category);
     const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">(
         quest.difficulty as "small" | "medium" | "hard"
+    );
+    const initSchedule = (): "daily" | "today" | "custom" => {
+        if (quest.isDaily) return "daily";
+        if (quest.deadline) {
+            const dl = new Date(quest.deadline).toISOString().split("T")[0];
+            const today = new Date().toISOString().split("T")[0];
+            return dl === today ? "today" : "custom";
+        }
+        return "today";
+    };
+    const [scheduleType, setScheduleType] = useState<"daily" | "today" | "custom">(initSchedule);
+    const [deadline, setDeadline] = useState(
+        quest.deadline ? new Date(quest.deadline).toISOString().split("T")[0] : ""
     );
     const subtaskIdRef = useRef(quest.subtasks.length);
     const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>(
@@ -47,12 +60,18 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
             const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
             const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
 
+            const isDaily = scheduleType === "daily";
+            const todayStr = new Date().toISOString().split("T")[0];
+            const effectiveDeadline = scheduleType === "today" ? todayStr : scheduleType === "custom" ? deadline : null;
+
             const payload: Record<string, unknown> = {
                 title,
                 category,
                 difficulty,
                 xpReward,
                 subtasks: validSubtasks,
+                isDaily,
+                deadline: effectiveDeadline,
             };
 
             const res = await fetch(`/api/habits/${quest._id}`, {
@@ -136,6 +155,51 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                             </select>
                         </div>
                     </div>
+
+                    <div className="form-group">
+                        <span style={{ fontSize: 'inherit', fontWeight: 500 }}>Schedule</span>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
+                            {(["daily", "today", "custom"] as const).map(type => {
+                                const icons = { daily: <RotateCw size={14} />, today: <CalendarCheck size={14} />, custom: <Calendar size={14} /> };
+                                const labels = { daily: "Daily", today: "Today", custom: "Custom" };
+                                const descs = { daily: "Repeats every day", today: "One-time, due today", custom: "Pick a deadline" };
+                                return (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setScheduleType(type)}
+                                        style={{
+                                            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                            padding: "10px 8px", borderRadius: 8, cursor: "pointer", fontSize: "0.8rem",
+                                            border: scheduleType === type ? "1.5px solid var(--accent-green)" : "1px solid rgba(255,255,255,0.1)",
+                                            background: scheduleType === type ? "rgba(0,255,136,0.08)" : "rgba(255,255,255,0.03)",
+                                            color: scheduleType === type ? "var(--accent-green)" : "var(--text-muted)",
+                                            transition: "border-color 0.2s, background 0.2s, color 0.2s",
+                                        }}
+                                    >
+                                        {icons[type]}
+                                        <strong>{labels[type]}</strong>
+                                        <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>{descs[type]}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {scheduleType === "custom" && (
+                        <div className="form-group">
+                            <label htmlFor="edit-quest-deadline">Deadline</label>
+                            <input
+                                id="edit-quest-deadline"
+                                type="date"
+                                required
+                                value={deadline}
+                                onChange={e => setDeadline(e.target.value)}
+                                min={new Date().toISOString().split("T")[0]}
+                                className="game-input"
+                            />
+                        </div>
+                    )}
 
                     <div className="form-group">
                         <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 500 }}>

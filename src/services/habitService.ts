@@ -89,14 +89,22 @@ export async function updateHabit(habitId: string, data: Partial<{
     xpReward: number;
     order: number;
     isActive: boolean;
+    isDaily: boolean;
+    deadline: string | null;
     subtasks: string[];
 }>) {
     await connectDB();
 
     // Extract subtasks separately — they live in a different collection
-    const { subtasks: newSubtasks, ...habitFields } = data;
+    const { subtasks: newSubtasks, deadline, ...habitFields } = data;
 
-    const habit = await Habit.findByIdAndUpdate(habitId, habitFields, { new: true }).lean();
+    // Convert deadline string to Date or unset it
+    const updateFields: Record<string, unknown> = { ...habitFields };
+    if (deadline !== undefined) {
+        updateFields.deadline = deadline ? new Date(deadline) : null;
+    }
+
+    const habit = await Habit.findByIdAndUpdate(habitId, updateFields, { new: true }).lean();
 
     // If subtasks were provided, replace them
     if (newSubtasks !== undefined) {

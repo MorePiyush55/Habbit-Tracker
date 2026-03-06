@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import useSWR from "swr";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar } from "lucide-react";
 
 const goalsFetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -23,9 +23,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">("medium");
     const subtaskIdRef = useRef(1);
     const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>([{id: 0, text: ""}]);
+    const [scheduleType, setScheduleType] = useState<"daily" | "today" | "custom">("daily");
     const [deadline, setDeadline] = useState("");
     const [linkedGoalId, setLinkedGoalId] = useState("");
-    const [isDaily, setIsDaily] = useState(true);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -57,16 +57,20 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
             const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
 
-            const payload: any = {
+            const isDaily = scheduleType === "daily";
+            const todayStr = new Date().toISOString().split("T")[0];
+            const effectiveDeadline = scheduleType === "today" ? todayStr : scheduleType === "custom" ? deadline : undefined;
+
+            const payload: Record<string, unknown> = {
                 title,
                 category,
                 difficulty,
                 xpReward,
                 subtasks: validSubtasks,
-                isDaily
+                isDaily,
             };
 
-            if (!isDaily && deadline) payload.deadline = deadline;
+            if (effectiveDeadline) payload.deadline = effectiveDeadline;
             if (linkedGoalId) payload.linkedGoalId = linkedGoalId;
 
             const res = await fetch("/api/habits", {
@@ -84,6 +88,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             setTitle("");
             setCategory("");
             setDifficulty("medium");
+            setScheduleType("daily");
             subtaskIdRef.current = 1;
             setSubtasks([{id: 0, text: ""}]);
             setDeadline("");
@@ -151,48 +156,64 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
+                    <div className="form-group">
+                        <span style={{ fontSize: 'inherit', fontWeight: 500 }}>Schedule</span>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
+                            {(["daily", "today", "custom"] as const).map(type => {
+                                const icons = { daily: <RotateCw size={14} />, today: <CalendarCheck size={14} />, custom: <Calendar size={14} /> };
+                                const labels = { daily: "Daily", today: "Today", custom: "Custom" };
+                                const descs = { daily: "Repeats every day", today: "One-time, due today", custom: "Pick a deadline" };
+                                return (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setScheduleType(type)}
+                                        style={{
+                                            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                            padding: "10px 8px", borderRadius: 8, cursor: "pointer", fontSize: "0.8rem",
+                                            border: scheduleType === type ? "1.5px solid var(--accent-green)" : "1px solid rgba(255,255,255,0.1)",
+                                            background: scheduleType === type ? "rgba(0,255,136,0.08)" : "rgba(255,255,255,0.03)",
+                                            color: scheduleType === type ? "var(--accent-green)" : "var(--text-muted)",
+                                            transition: "border-color 0.2s, background 0.2s, color 0.2s",
+                                        }}
+                                    >
+                                        {icons[type]}
+                                        <strong>{labels[type]}</strong>
+                                        <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>{descs[type]}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {scheduleType === "custom" && (
                         <div className="form-group">
-                            <span style={{ fontSize: 'inherit', fontWeight: 'inherit' }}>Schedule</span>
-                            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={isDaily}
-                                    onChange={(e) => setIsDaily(e.target.checked)}
-                                    className="game-checkbox"
-                                />
-                                Make Daily Repeating Task
-                            </label>
-                        </div>
-
-                        {!isDaily && (
-                            <div className="form-group">
-                                <label htmlFor="create-quest-deadline">Deadline (One-Time Task)</label>
-                                <input
-                                    id="create-quest-deadline"
-                                    type="date"
-                                    value={deadline}
-                                    onChange={e => setDeadline(e.target.value)}
-                                    min={new Date().toISOString().split("T")[0]}
-                                    className="game-input"
-                                />
-                            </div>
-                        )}
-
-                        <div className="form-group" style={{ gridColumn: isDaily ? "1 / -1" : "auto" }}>
-                            <label htmlFor="create-quest-goal">Link to Goal (Optional)</label>
-                            <select
-                                id="create-quest-goal"
-                                value={linkedGoalId}
-                                onChange={e => setLinkedGoalId(e.target.value)}
+                            <label htmlFor="create-quest-deadline">Deadline</label>
+                            <input
+                                id="create-quest-deadline"
+                                type="date"
+                                required
+                                value={deadline}
+                                onChange={e => setDeadline(e.target.value)}
+                                min={new Date().toISOString().split("T")[0]}
                                 className="game-input"
-                            >
-                                <option value="">No Goal</option>
-                                {availableGoals.map(g => (
-                                    <option key={g._id} value={g._id}>{g.title}</option>
-                                ))}
-                            </select>
+                            />
                         </div>
+                    )}
+
+                    <div className="form-group">
+                        <label htmlFor="create-quest-goal">Link to Goal (Optional)</label>
+                        <select
+                            id="create-quest-goal"
+                            value={linkedGoalId}
+                            onChange={e => setLinkedGoalId(e.target.value)}
+                            className="game-input"
+                        >
+                            <option value="">No Goal</option>
+                            {availableGoals.map(g => (
+                                <option key={g._id} value={g._id}>{g.title}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="form-group">

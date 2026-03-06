@@ -20,6 +20,8 @@ export interface Quest {
     subtasks: Subtask[];
     completionPercent: number;
     isFullyCompleted: boolean;
+    isDaily?: boolean;
+    deadline?: string;
 }
 
 interface QuestPanelProps {
