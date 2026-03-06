@@ -3,29 +3,29 @@
  * ======================================
  * This is the central nervous system of the application.
  *
- * Architecture (v2 — Autonomous):
- *   User Actions → Event Bus → System State + Memory → Brain Controller
- *        → Decision Engine → Directive Executor → Personality Layer → UI
+ * Architecture (v3 — Brain v2 + Multi-Agent Console):
  *
+ *   User / Console
+ *        ↓
+ *   Command Interpreter
+ *        ↓
+ *   System Brain v2 (orchestrator)
+ *        ↓
+ *   Decision Engine (rule vs AI vs cache routing)
+ *        ↓
+ *   AI Modules:
+ *     • behaviorAnalyzer   • evolutionEngine
+ *     • shadowCoach        • lifeSimulator
+ *     • cognitiveOptimizer • brainController
+ *        ↓
+ *   Directive Generator → Directive Formatter
+ *        ↓
+ *   Directive Executor → UI / Notifications
+ *
+ *   Event Bus → System State + Memory → Brain → Directives → Execute
  *   Scheduler (autonomous) → Event Bus → ... (same pipeline)
  *
- * Components:
- *   - systemState.ts        — Central state builder (one call, complete picture)
- *   - systemMemory.ts       — Persistent intelligence layer (weekly insights, caches, metrics)
- *   - eventBus.ts           — Event emission and routing
- *   - brainController.ts    — Decision engine (rules + AI)
- *   - decisionEngine.ts     — Directive evaluation, scoring, conflict resolution
- *   - directiveExecutor.ts  — Executes brain decisions
- *   - interventionEngine.ts — Escalating system response (warning → penalty → training → difficulty↓)
- *   - behaviorAnalyzer.ts   — Deep 30-day analysis
- *   - trainingEngine.ts     — Skill testing flow
- *   - skillGraph.ts         — Knowledge graph for skill relationships
- *   - strategyGenerator.ts  — Daily strategy production (with cache)
- *   - contextBuilder.ts     — Structured AI prompt context
- *   - personalityLayer.ts   — Consistent System voice
- *   - qualityControl.ts     — AI response validation
- *   - observability.ts      — System metrics & health tracking
- *   - systemScheduler.ts    — Autonomous background checks
+ * Total modules: 23
  */
 
 // Central State
@@ -38,12 +38,27 @@ export type { MemorySnapshot } from "./systemMemory";
 // Event Bus — The heartbeat
 export { emit, emitBatch, emitSilent, createEvent, SystemEvents } from "./eventBus";
 
-// Brain Controller — The intelligence
+// Brain Controller (v1) — The intelligence
 export { processBrainEvent } from "./brainController";
 
+// Brain v2 — Central orchestrator
+export { processCommand } from "./systemBrainV2";
+export type { BrainV2Response, AgentMessage, AgentRole } from "./systemBrainV2";
+
+// Command Interpreter — NL → system events
+export { interpretCommand, getAvailableCommands } from "./commandInterpreter";
+export type { SystemCommand, CommandType } from "./commandInterpreter";
+
 // Decision Engine — Reasoning before action
-export { evaluateDirectives } from "./decisionEngine";
-export type { EvaluatedDirective, DecisionResult } from "./decisionEngine";
+export { evaluateDirectives, routeDecision } from "./decisionEngine";
+export type { EvaluatedDirective, DecisionResult, DecisionPath, RoutingDecision } from "./decisionEngine";
+
+// Directive Generator — Structured actions
+export { generateConsoleDirective } from "./directiveGenerator";
+export type { ConsoleDirective, ConsoleDirectiveType } from "./directiveGenerator";
+
+// Directive Formatter — System personality on directives
+export { formatDirective } from "./directiveFormatter";
 
 // Directive Executor — The executor
 export { executeDirectives } from "./directiveExecutor";
@@ -87,3 +102,19 @@ export type { SystemMetrics, SystemHealthReport } from "./observability";
 // Scheduler — Autonomous mode
 export { runScheduledChecks, runBatchScheduledChecks } from "./systemScheduler";
 export type { SchedulerResult, BatchSchedulerResult } from "./systemScheduler";
+
+// Evolution Engine — AI self-improvement
+export { evolveStrategy, getStoredParams } from "./evolutionEngine";
+export type { EvolutionResult, EvolutionRule, StrategyParameters } from "./evolutionEngine";
+
+// Shadow Coach — Dual brain directive critic
+export { reviewStrategy, reviewConsoleResponse } from "./shadowCoach";
+export type { CoachReview, CoachAdjustment } from "./shadowCoach";
+
+// Life Simulator — Future projection
+export { simulateFuture } from "./lifeSimulator";
+export type { FutureProjection } from "./lifeSimulator";
+
+// Cognitive Optimizer — Workload intelligence
+export { assessCognitiveLoad } from "./cognitiveOptimizer";
+export type { CognitiveAssessment, TaskRecommendation } from "./cognitiveOptimizer";

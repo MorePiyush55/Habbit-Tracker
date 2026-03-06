@@ -397,6 +397,67 @@ function checkMemoryConflicts(
 }
 
 // ============================================================
+// DECISION ROUTING: Choose rule vs AI vs cache
+// ============================================================
+
+export type DecisionPath = "rule" | "ai" | "cache";
+
+export interface RoutingDecision {
+    path: DecisionPath;
+    reason: string;
+    confidence: number;
+}
+
+/**
+ * Determines whether a command/directive should be handled by
+ * rule engine, AI, or cached response.
+ */
+export function routeDecision(
+    directiveType: string,
+    memory: MemorySnapshot | null
+): RoutingDecision {
+    // Always rule-based (deterministic, instant)
+    const RULE_TYPES = new Set([
+        "REWARD_XP", "DEDUCT_XP", "LOG_BEHAVIOR", "UPDATE_BOSS",
+        "SCALE_DIFFICULTY", "NO_ACTION", "ANALYZE_PERFORMANCE",
+        "SHOW_REMAINING_TASKS", "SHOW_COMPLETED_TASKS", "SHOW_STATUS",
+        "SHOW_SKILL_REPORT", "SHOW_HELP",
+        "REQUEST_REMAINING_TASKS", "REQUEST_COMPLETED_TASKS",
+        "REQUEST_STATUS", "REQUEST_SKILL_REPORT", "REQUEST_HELP",
+        "REQUEST_PREDICTION", "REQUEST_WORKLOAD_CHECK",
+    ]);
+
+    // Always AI (complex reasoning needed)
+    const AI_TYPES = new Set([
+        "GENERATE_STRATEGY", "FREE_CHAT", "REQUEST_DEBRIEF",
+        "REQUEST_BEHAVIOR_ANALYSIS", "REQUEST_MOTIVATION",
+    ]);
+
+    // Cache candidates (check memory first)
+    const CACHE_TYPES = new Set([
+        "GENERATE_QUEST", "REQUEST_DAILY_STRATEGY",
+    ]);
+
+    if (RULE_TYPES.has(directiveType)) {
+        return { path: "rule", reason: "Deterministic operation — rule engine handles this.", confidence: 1.0 };
+    }
+
+    if (CACHE_TYPES.has(directiveType) && memory) {
+        const today = new Date().toISOString().split("T")[0];
+        if (memory.lastStrategy.date === today) {
+            return { path: "cache", reason: "Today's result already cached in memory.", confidence: 0.95 };
+        }
+    }
+
+    if (AI_TYPES.has(directiveType)) {
+        return { path: "ai", reason: "Complex reasoning required — AI layer needed.", confidence: 0.85 };
+    }
+
+    // Default to rule with lower confidence
+    return { path: "rule", reason: "Unknown type — defaulting to rule engine.", confidence: 0.5 };
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 
