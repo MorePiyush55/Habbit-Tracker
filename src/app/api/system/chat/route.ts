@@ -27,17 +27,21 @@ export async function POST(req: Request) {
         // Gather deep context for AI
         const user = await User.findById(userId).lean();
         const date = new Date().toISOString().split("T")[0];
-        const progress = await getTodayProgress(userId, date);
 
-        // Map habits and subtasks deeply
-        const todayQuests = progress.habits.map((h: any) => ({
-            title: h.title,
-            difficulty: h.difficulty,
-            percent: h.completionPercent,
-            subtasksCompleted: h.subtasks.filter((s: any) => s.completed).length,
-            subtasksTotal: h.subtasks.length,
-            details: h.subtasks.map((s: any) => `${s.title}: ${s.completed ? 'Done' : 'Pending'}`)
-        }));
+        let todayQuests: any[] = [];
+        try {
+            const progress = await getTodayProgress(userId, date);
+            todayQuests = progress.habits.map((h: any) => ({
+                title: h.title,
+                difficulty: h.difficulty,
+                percent: h.completionPercent,
+                subtasksCompleted: h.subtasks.filter((s: any) => s.completed).length,
+                subtasksTotal: h.subtasks.length,
+                details: h.subtasks.map((s: any) => `${s.title}: ${s.completed ? 'Done' : 'Pending'}`)
+            }));
+        } catch (progressError: any) {
+            console.error("[System Chat] Progress fetch error (non-fatal):", progressError.message);
+        }
 
         const hunterData = {
             level: user?.level,
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
             todayQuests
         };
 
-        // Fetch recent chat history
+        // Fetch recent chat history for memory
         const recentMessages = await SystemMessage.find({ userId })
             .sort({ timestamp: -1 })
             .limit(10)
@@ -57,8 +61,10 @@ export async function POST(req: Request) {
             content: msg.content
         }));
 
-        // Call Gemini
+        // Call Gemini (with timeout + fallback built in)
+        console.log("[System Chat] Calling Gemini for user:", userId);
         const aiResponse = await generateSystemResponse(userId, hunterData, history, message);
+        console.log("[System Chat] Gemini responded successfully");
 
         // Save System response
         await SystemMessage.create({
@@ -67,47 +73,19 @@ export async function POST(req: Request) {
             content: aiResponse.reply
         });
 
-        let penaltyData = null;
-
-        // Apply Penalty if issued
-        if (aiResponse.issuePenalty && aiResponse.penaltyQuestTitle) {
-            const xpDeduct = aiResponse.penaltyXPDeduction || 25;
-
-            // Deduct XP but don't drop below 0
-            if (user) {
-                const newXP = Math.max(0, user.totalXP - xpDeduct);
-                await User.findByIdAndUpdate(userId, { totalXP: newXP });
-            }
-
-            // Create Penalty Quest for tomorrow
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            const penalty = await PenaltyQuest.create({
-                userId,
-                reason: aiResponse.penaltyReason || "Weak mindset",
-                penaltyType: "System Assigned",
-                questTitle: aiResponse.penaltyQuestTitle,
-                xpReward: Math.round(xpDeduct * 1.5), // Bonus for making it up
-                expires: tomorrow,
-                completed: false
-            });
-
-            penaltyData = {
-                reason: penalty.reason,
-                questTitle: penalty.questTitle,
-                xpPenalty: xpDeduct
-            };
-        }
-
         return Response.json({
             reply: aiResponse.reply,
-            penalty: penaltyData
+            penalty: null
         });
 
     } catch (error: any) {
-        console.error("System Chat API Error:", error.message || error);
-        return Response.json({ error: error.message || "Failed to communicate with the System." }, { status: 500 });
+        console.error("[System Chat API CRITICAL Error]:", error.message || error);
+
+        // Even on total crash, return a message to the frontend
+        return Response.json({
+            reply: "⚠ SYSTEM NOTICE\n\nCritical system failure.\nThe System could not process your request.\nRetry your command, Hunter.",
+            penalty: null
+        });
     }
 }
 
@@ -119,7 +97,7 @@ export async function GET() {
         await connectDB();
 
         const messages = await SystemMessage.find({ userId })
-            .sort({ timestamp: 1 }) // Chronological order
+            .sort({ timestamp: 1 })
             .lean();
 
         return Response.json({ messages });

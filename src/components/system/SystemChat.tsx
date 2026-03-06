@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
-import { Send, ShieldAlert, Zap } from "lucide-react";
+import { Send, ShieldAlert, Zap, AlertTriangle } from "lucide-react";
 
 interface ChatMessage {
     _id: string;
@@ -12,18 +14,19 @@ export default function SystemChat() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [statusText, setStatusText] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Fetch history
     useEffect(() => {
-        if (messages.length === 0) {
-            fetch("/api/system/chat")
-                .then(res => res.json())
-                .then(data => {
-                    if (data.messages) setMessages(data.messages);
-                })
-                .catch(err => console.error("Error fetching chat:", err));
-        }
+        fetch("/api/system/chat")
+            .then(res => res.json())
+            .then(data => {
+                if (data.messages && data.messages.length > 0) {
+                    setMessages(data.messages);
+                }
+            })
+            .catch(err => console.error("Error fetching chat:", err));
     }, []);
 
     // Scroll to bottom
@@ -31,7 +34,7 @@ export default function SystemChat() {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
-    }, [messages]);
+    }, [messages, loading]);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,6 +47,20 @@ export default function SystemChat() {
         const tempId = Date.now().toString();
         setMessages(prev => [...prev, { _id: tempId, role: "user", content: userMsg, timestamp: new Date().toISOString() }]);
         setLoading(true);
+        setStatusText("SYSTEM IS ANALYZING...");
+
+        // Cycle typing animation text
+        const statusMessages = [
+            "SYSTEM IS ANALYZING...",
+            "PROCESSING HUNTER DATA...",
+            "EVALUATING RESPONSE...",
+            "GENERATING DIRECTIVE..."
+        ];
+        let statusIndex = 0;
+        const statusInterval = setInterval(() => {
+            statusIndex = (statusIndex + 1) % statusMessages.length;
+            setStatusText(statusMessages[statusIndex]);
+        }, 3000);
 
         try {
             const res = await fetch("/api/system/chat", {
@@ -54,11 +71,29 @@ export default function SystemChat() {
 
             const data = await res.json();
 
+            clearInterval(statusInterval);
+
             if (data.reply) {
                 setMessages(prev => [...prev, {
                     _id: (Date.now() + 1).toString(),
                     role: "system",
                     content: data.reply,
+                    timestamp: new Date().toISOString()
+                }]);
+            } else if (data.error) {
+                // API returned an error message
+                setMessages(prev => [...prev, {
+                    _id: (Date.now() + 1).toString(),
+                    role: "system",
+                    content: `⚠ SYSTEM NOTICE\n\n${data.error}`,
+                    timestamp: new Date().toISOString()
+                }]);
+            } else {
+                // No reply and no error — total silent failure
+                setMessages(prev => [...prev, {
+                    _id: (Date.now() + 1).toString(),
+                    role: "system",
+                    content: "⚠ SYSTEM NOTICE\n\nNo response received.\nRetry your command, Hunter.",
                     timestamp: new Date().toISOString()
                 }]);
             }
@@ -72,12 +107,23 @@ export default function SystemChat() {
                         content: penaltyMsg,
                         timestamp: new Date().toISOString()
                     }]);
-                }, 1000); // Slight delay for dramatic effect
+                }, 1000);
             }
         } catch (err) {
+            clearInterval(statusInterval);
             console.error("Chat error:", err);
+
+            // Network failure fallback
+            setMessages(prev => [...prev, {
+                _id: (Date.now() + 1).toString(),
+                role: "system",
+                content: "⚠ SYSTEM NOTICE\n\nCommunication with the System failed.\nCheck your connection and retry.",
+                timestamp: new Date().toISOString()
+            }]);
         } finally {
+            clearInterval(statusInterval);
             setLoading(false);
+            setStatusText("");
         }
     };
 
@@ -88,11 +134,18 @@ export default function SystemChat() {
                     <ShieldAlert size={18} className="system-icon" />
                     <span>THE SYSTEM</span>
                 </div>
+                <div className="system-status-dot" style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    backgroundColor: loading ? "#ff4444" : "#00ff88",
+                    boxShadow: loading ? "0 0 8px #ff4444" : "0 0 8px #00ff88",
+                    animation: loading ? "pulse 1s infinite" : "none"
+                }} />
             </div>
 
             <div className="chat-messages" style={{ height: "calc(100vh - 250px)" }}>
                 {messages.length === 0 && !loading && (
                     <div className="system-message system-announcement">
+                        <AlertTriangle size={16} style={{ marginRight: 8 }} />
                         [HUNTER STATUS DETECTED: AWAITING INPUT. EXPLAIN YOUR ACTIONS.]
                     </div>
                 )}
@@ -105,10 +158,15 @@ export default function SystemChat() {
                 ))}
 
                 {loading && (
-                    <div className="chat-bubble system-bubble typing">
-                        <span className="dot"></span>
-                        <span className="dot"></span>
-                        <span className="dot"></span>
+                    <div className="chat-bubble system-bubble typing" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ color: "var(--accent-red)", fontWeight: 600, fontSize: "0.75rem", letterSpacing: "2px", textTransform: "uppercase" }}>
+                            {statusText}
+                        </div>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                        </div>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
