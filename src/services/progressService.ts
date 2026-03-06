@@ -8,6 +8,8 @@ import { calculateXP } from "@/lib/game-engine/xpSystem";
 import { getLevelFromXP } from "@/lib/game-engine/levelSystem";
 import { calculateStreak } from "@/lib/game-engine/streakSystem";
 import { checkAndFireEvents } from "@/lib/systemEventEngine";
+import { incrementConsecutiveCompletion } from "@/lib/game-engine/difficultyScaler";
+import BehaviorLog from "@/models/BehaviorLog";
 import { Difficulty } from "@/types";
 
 export async function getTodayProgress(userId: string, date: string) {
@@ -199,6 +201,52 @@ export async function toggleSubtaskProgress(
         });
     } catch (eventError: any) {
         console.error("[System Events] Non-fatal event processing error:", eventError.message);
+    }
+
+    // Log Behavior Snapshot (non-blocking)
+    try {
+        const user = await User.findById(userId).lean();
+        const questsCompleted2 = allEntries.filter(e => e.completed).length;
+        const weakHabits = allHabits
+            .filter(h => {
+                const entries = allEntries.filter(e => e.habitId.toString() === h._id.toString());
+                const completed = entries.filter(e => e.completed).length;
+                return entries.length > 0 && completed / entries.length < 0.5;
+            })
+            .map(h => h.title);
+        const strongHabits = allHabits
+            .filter(h => {
+                const entries = allEntries.filter(e => e.habitId.toString() === h._id.toString());
+                const completed = entries.filter(e => e.completed).length;
+                return entries.length > 0 && completed / entries.length >= 0.8;
+            })
+            .map(h => h.title);
+
+        await BehaviorLog.findOneAndUpdate(
+            { userId, date },
+            {
+                $set: {
+                    tasksCompleted: questsCompleted2,
+                    tasksFailed: allEntries.filter(e => !e.completed).length,
+                    totalTasks: totalSubtasks,
+                    completionRate,
+                    streakStatus: user?.currentStreak || 0,
+                    xpEarned: totalXP,
+                    disciplineScore: user?.disciplineScore || 50,
+                    focusScore: user?.focusScore || 50,
+                    weakHabits,
+                    strongHabits
+                }
+            },
+            { upsert: true }
+        );
+
+        // Track consecutive completions for difficulty scaling
+        if (completed && completionRate === 100) {
+            await incrementConsecutiveCompletion(habitId);
+        }
+    } catch (behaviorError: any) {
+        console.error("[Behavior Log] Non-fatal error:", behaviorError.message);
     }
 
     return { totalXP, completionRate, bossDefeated, xpDelta };

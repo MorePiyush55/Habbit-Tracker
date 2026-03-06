@@ -10,6 +10,8 @@ const HabitSchema = new Schema(
         order: { type: Number, default: 0 },
         isActive: { type: Boolean, default: true },
         isDaily: { type: Boolean, default: true },
+        difficultyLevel: { type: Number, default: 1, min: 1, max: 5 },
+        consecutiveCompletions: { type: Number, default: 0 },
         // Phase 5 additions for advanced tracking
         totalSubtasks: { type: Number, default: 0 },
         completedSubtasks: { type: Number, default: 0 },

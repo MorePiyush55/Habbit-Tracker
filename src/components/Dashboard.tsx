@@ -9,6 +9,7 @@ import StreakDisplay from "@/components/game/StreakDisplay";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemChat from "@/components/system/SystemChat";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
+import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import { LogOut } from "lucide-react";
@@ -203,6 +204,8 @@ export default function Dashboard() {
                         onToggleSubtask={handleToggleSubtask}
                         loading={toggling}
                     />
+
+                    <DailyStrategyPanel />
                 </div>
 
                 {/* Right Sidebar: System AI Controller */}
