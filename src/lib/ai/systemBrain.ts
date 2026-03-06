@@ -45,6 +45,53 @@ function extractJSON(text: string): any {
 }
 
 // ============================================================
+// MEMORY: Analyze 30-day behavior patterns
+// ============================================================
+function analyzeBehaviorPatterns(logs: any[]) {
+    if (logs.length === 0) {
+        return { summary: "No behavior data yet.", activeDays: 0 };
+    }
+
+    const completionRates = logs.map((l: any) => l.completionRate || 0);
+    const avgCompletion = Math.round(completionRates.reduce((a: number, b: number) => a + b, 0) / completionRates.length);
+
+    // Trend: compare first half vs second half
+    const halfLen = Math.floor(completionRates.length / 2);
+    const recentAvg = completionRates.slice(0, halfLen).reduce((a: number, b: number) => a + b, 0) / (halfLen || 1);
+    const olderAvg = completionRates.slice(halfLen).reduce((a: number, b: number) => a + b, 0) / (halfLen || 1);
+    const trend = recentAvg > olderAvg + 5 ? "improving" : recentAvg < olderAvg - 5 ? "declining" : "stable";
+
+    // Most frequent weak and strong habits
+    const weakCounts: Record<string, number> = {};
+    const strongCounts: Record<string, number> = {};
+    logs.forEach((log: any) => {
+        (log.weakHabits || []).forEach((h: string) => { weakCounts[h] = (weakCounts[h] || 0) + 1; });
+        (log.strongHabits || []).forEach((h: string) => { strongCounts[h] = (strongCounts[h] || 0) + 1; });
+    });
+
+    const topWeakHabits = Object.entries(weakCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, count]) => `${h} (weak ${count} days)`);
+    const topStrongHabits = Object.entries(strongCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, count]) => `${h} (strong ${count} days)`);
+
+    // Discipline trajectory
+    const disciplineScores = logs.map((l: any) => l.disciplineScore || 50);
+    const latestDiscipline = disciplineScores[0] || 50;
+    const oldestDiscipline = disciplineScores[disciplineScores.length - 1] || 50;
+    const disciplineDelta = latestDiscipline - oldestDiscipline;
+
+    return {
+        activeDays: logs.length,
+        avgCompletion,
+        trend,
+        topWeakHabits,
+        topStrongHabits,
+        disciplineTrajectory: disciplineDelta > 0 ? `+${disciplineDelta} points` : `${disciplineDelta} points`,
+        bestDay: logs.reduce((best: any, l: any) => (l.completionRate > (best?.completionRate || 0) ? l : best), null)?.date || "N/A",
+        worstDay: logs.reduce((worst: any, l: any) => (l.completionRate < (worst?.completionRate || 100) ? l : worst), null)?.date || "N/A",
+        summary: `${logs.length}-day history | Avg: ${avgCompletion}% | Trend: ${trend} | Discipline: ${disciplineDelta > 0 ? "+" : ""}${disciplineDelta}`
+    };
+}
+
+// ============================================================
 // CORE: System Decision — ALL AI decisions route through here
 // ============================================================
 export async function systemDecision(
@@ -54,15 +101,39 @@ export async function systemDecision(
 ): Promise<any> {
     await connectDB();
 
-    // Gather universal context
-    const user = await User.findById(userId).lean();
-    const habits = await Habit.find({ userId, isActive: true }).lean();
-    const behaviorLogs = await BehaviorLog.find({ userId })
-        .sort({ date: -1 })
-        .limit(30)
-        .lean();
+    // ============================================================
+    // MEMORY LAYER: Gather comprehensive user context
+    // ============================================================
+    const [user, habits, behaviorLogs, skillScores, skillNodes, learningPaths, recentDecisions] = await Promise.all([
+        User.findById(userId).lean(),
+        Habit.find({ userId, isActive: true }).lean(),
+        BehaviorLog.find({ userId }).sort({ date: -1 }).limit(30).lean(),
+        SkillScore.find({ userId }).sort({ score: 1 }).lean(),
+        (async () => {
+            try {
+                const SkillNode = (await import("@/models/SkillNode")).default;
+                return SkillNode.find({ userId, isActive: true }).lean();
+            } catch { return []; }
+        })(),
+        (async () => {
+            try {
+                const LearningPath = (await import("@/models/LearningPath")).default;
+                return LearningPath.find({ userId, isActive: true }).lean();
+            } catch { return []; }
+        })(),
+        (async () => {
+            try {
+                const SystemDecision = (await import("@/models/SystemDecision")).default;
+                return SystemDecision.find({ userId }).sort({ createdAt: -1 }).limit(10).lean();
+            } catch { return []; }
+        })()
+    ]);
+
+    // Analyze 30-day behavior patterns
+    const behaviorAnalysis = analyzeBehaviorPatterns(behaviorLogs);
 
     const universalContext = {
+        // Core identity
         hunter: {
             level: user?.level || 1,
             xp: user?.totalXP || 0,
@@ -73,6 +144,8 @@ export async function systemDecision(
             skillGrowthScore: user?.skillGrowthScore || 50,
             hunterRank: user?.hunterRank || "E-Class"
         },
+
+        // Current habits with difficulty progression
         habits: habits.map((h: any) => ({
             title: h.title,
             category: h.category,
@@ -80,13 +153,55 @@ export async function systemDecision(
             difficultyLevel: h.difficultyLevel || 1,
             consecutiveCompletions: h.consecutiveCompletions || 0
         })),
+
+        // Skill proficiency (sorted weakest first)
+        skillProficiency: skillScores.map((s: any) => ({
+            skill: s.skill,
+            category: s.category,
+            score: s.score,
+            testsCompleted: s.testsCompleted,
+            trend: s.trend,
+            lastTested: s.lastTested ? new Date(s.lastTested).toISOString().split("T")[0] : "never"
+        })),
+
+        // Skill graph (knowledge relationships)
+        skillGraph: (skillNodes as any[]).map((n: any) => ({
+            skill: n.skill,
+            category: n.category,
+            relatedSkills: n.relatedSkills,
+            difficulty: n.difficulty
+        })),
+
+        // Learning paths progress
+        learningProgress: (learningPaths as any[]).map((lp: any) => ({
+            title: lp.title,
+            progress: `${lp.completedSections}/${lp.totalSections}`,
+            percentComplete: lp.totalSections > 0 ? Math.round((lp.completedSections / lp.totalSections) * 100) : 0,
+            weakTopics: lp.weakTopics || [],
+            masteredTopics: lp.masteredTopics || []
+        })),
+
+        // 7-day behavior trend (recent)
         behaviorTrend: behaviorLogs.slice(0, 7).map((log: any) => ({
             date: log.date,
             completionRate: log.completionRate,
             tasksCompleted: log.tasksCompleted,
             tasksFailed: log.tasksFailed,
-            weakHabits: log.weakHabits
+            weakHabits: log.weakHabits,
+            strongHabits: log.strongHabits
         })),
+
+        // 30-day behavioral patterns (analyzed)
+        behaviorPatterns: behaviorAnalysis,
+
+        // Recent AI decisions (for context continuity)
+        recentSystemActions: (recentDecisions as any[]).slice(0, 5).map((d: any) => ({
+            action: d.decisionType,
+            reason: d.reason,
+            date: d.date
+        })),
+
+        // Caller-supplied context
         ...context
     };
 
