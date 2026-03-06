@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import QuestPanel from "@/components/game/QuestPanel";
@@ -8,16 +8,17 @@ import type { Quest } from "@/components/game/QuestPanel";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import EditQuestModal from "@/components/game/EditQuestModal";
 import AppNav from "@/components/AppNav";
-import { ListChecks, Loader2 } from "lucide-react";
+import { ListChecks } from "lucide-react";
 
 export default function TasksPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [quests, setQuests] = useState<Quest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [toggling, setToggling] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
+    const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingToggles = useRef(0);
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -45,8 +46,19 @@ export default function TasksPage() {
         return () => clearInterval(interval);
     }, [fetchQuests]);
 
+    // Background sync: debounced re-fetch after toggling stops
+    const scheduleSync = useCallback(() => {
+        if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = setTimeout(async () => {
+            // Only sync if no toggles are in flight
+            if (pendingToggles.current === 0) {
+                await fetchQuests();
+            }
+        }, 1500);
+    }, [fetchQuests]);
+
     const handleToggleSubtask = async (habitId: string, subtaskId: string, completed: boolean) => {
-        setToggling(true);
+        // Optimistic update — instant, no disabling
         setQuests((prev) =>
             prev.map((q) => {
                 if (q._id !== habitId) return q;
@@ -64,17 +76,19 @@ export default function TasksPage() {
             })
         );
 
+        // Fire API call in background — don't block UI
+        pendingToggles.current++;
         try {
-            const res = await fetch("/api/progress", {
+            await fetch("/api/progress", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ habitId, subtaskId, completed, date: today }),
             });
-            if (res.ok) await fetchQuests();
         } catch {
-            await fetchQuests();
+            // On error, schedule a sync to get correct state
         }
-        setToggling(false);
+        pendingToggles.current--;
+        scheduleSync();
     };
 
     const handleDeleteQuest = async (habitId: string) => {
@@ -96,8 +110,7 @@ export default function TasksPage() {
     };
 
     const handleToggleMainTask = async (habitId: string, completed: boolean) => {
-        setToggling(true);
-        // Optimistic update
+        // Optimistic update — instant, no disabling
         setQuests((prev) =>
             prev.map((q) => {
                 if (q._id !== habitId) return q;
@@ -109,18 +122,28 @@ export default function TasksPage() {
             })
         );
 
+        // Fire API call in background
+        pendingToggles.current++;
         try {
-            const res = await fetch("/api/progress", {
+            await fetch("/api/progress", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ habitId, subtaskId: "", completed, date: today }),
             });
-            if (res.ok) await fetchQuests();
         } catch {
-            await fetchQuests();
+            // sync will fix it
         }
-        setToggling(false);
+        pendingToggles.current--;
+        scheduleSync();
     };
+
+    // Sort: incomplete quests first, completed quests at the bottom
+    const sortedQuests = useMemo(() => {
+        return [...quests].sort((a, b) => {
+            if (a.isFullyCompleted === b.isFullyCompleted) return 0;
+            return a.isFullyCompleted ? 1 : -1;
+        });
+    }, [quests]);
 
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
     const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
@@ -202,19 +225,14 @@ export default function TasksPage() {
 
                 {/* Full Quest List */}
                 <div className="tasks-content">
-                    {toggling && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--accent-blue)", fontSize: "0.85rem" }}>
-                            <Loader2 size={14} className="spinning" /> Syncing...
-                        </div>
-                    )}
                     <QuestPanel
-                        quests={quests}
+                        quests={sortedQuests}
                         date={today}
                         onToggleSubtask={handleToggleSubtask}
                         onDeleteQuest={handleDeleteQuest}
                         onEditQuest={handleEditQuest}
                         onToggleMainTask={handleToggleMainTask}
-                        loading={toggling}
+                        loading={false}
                     />
                 </div>
             </div>
