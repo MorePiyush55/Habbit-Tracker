@@ -3,29 +3,31 @@
  * ======================================
  * This is the central nervous system of the application.
  *
- * Architecture (v3 — Brain v2 + Multi-Agent Console):
+ * Architecture (v4 — Brain v3 Autonomous + Multi-Agent Console):
  *
- *   User / Console
+ *   User / Console / Scheduler
  *        ↓
- *   Command Interpreter
+ *   Command Interpreter (NL + 17 slash commands)
  *        ↓
- *   System Brain v2 (orchestrator)
+ *   System Brain v3 (autonomous orchestrator)
  *        ↓
- *   Decision Engine (rule vs AI vs cache routing)
+ *   Decision Engine + Constraint Layers:
+ *     • Evolution Engine (self-evolving rules)
+ *     • Shadow Coach (reviews ALL outputs)
+ *     • Cognitive Optimizer (workload caps)
  *        ↓
  *   AI Modules:
- *     • behaviorAnalyzer   • evolutionEngine
- *     • shadowCoach        • lifeSimulator
- *     • cognitiveOptimizer • brainController
+ *     • behaviorAnalyzer   • lifeSimulator
+ *     • trainingEngine     • strategyGenerator
+ *     • brainController    • personalityLayer
  *        ↓
  *   Directive Generator → Directive Formatter
  *        ↓
- *   Directive Executor → UI / Notifications
+ *   Multi-Agent Response → UI / Notifications
  *
- *   Event Bus → System State + Memory → Brain → Directives → Execute
- *   Scheduler (autonomous) → Event Bus → ... (same pipeline)
+ *   Scheduler (autonomous) → Brain v3 autonomous events
  *
- * Total modules: 23
+ * Total modules: 24
  */
 
 // Central State
@@ -41,9 +43,13 @@ export { emit, emitBatch, emitSilent, createEvent, SystemEvents } from "./eventB
 // Brain Controller (v1) — The intelligence
 export { processBrainEvent } from "./brainController";
 
-// Brain v2 — Central orchestrator
-export { processCommand } from "./systemBrainV2";
-export type { BrainV2Response, AgentMessage, AgentRole } from "./systemBrainV2";
+// Brain v2 — Legacy orchestrator (kept for reference)
+export { processCommand as processCommandV2 } from "./systemBrainV2";
+export type { BrainV2Response } from "./systemBrainV2";
+
+// Brain v3 — Autonomous orchestrator (active)
+export { processCommand, processAutonomousEvent } from "./systemBrainV3";
+export type { BrainV3Response, AgentMessage, AgentRole } from "./systemBrainV3";
 
 // Command Interpreter — NL → system events
 export { interpretCommand, getAvailableCommands } from "./commandInterpreter";

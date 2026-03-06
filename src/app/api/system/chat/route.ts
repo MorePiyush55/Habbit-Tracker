@@ -1,19 +1,19 @@
 /**
- * System Chat API — Brain v2 Powered
+ * System Chat API — Brain v3 Powered
  * =====================================
- * POST: Messages now route through the full Brain v2 pipeline:
- *   message → commandInterpreter → systemBrainV2 → directive → formatted response
+ * POST: Messages route through the full Brain v3 pipeline:
+ *   message → commandInterpreter → systemBrainV3 → directive → formatted response
  *
  * GET: Returns chat history (used by both SystemChat and SystemConsole)
  *
- * The old direct-AI path is replaced. All intelligence now flows through
- * the command interpreter + brain v2, keeping AI as ONE layer of reasoning.
+ * v3: autonomous reasoning, evolution integration, shadow coach review,
+ * cognitive constraints. AI is ONE layer of reasoning.
  */
 
 import { getUserId } from "@/lib/auth";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import { interpretCommand } from "@/lib/core/commandInterpreter";
-import { processCommand } from "@/lib/core/systemBrainV2";
+import { processCommand } from "@/lib/core/systemBrainV3";
 import connectDB from "@/lib/mongodb";
 import SystemMessage from "@/models/SystemMessage";
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
             content: message,
         });
 
-        // ── Route through Brain v2 pipeline ──────────────
+        // ── Route through Brain v3 pipeline ──────────────
         const command = interpretCommand(message);
         const result = await processCommand(userId, command);
 

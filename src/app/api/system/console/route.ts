@@ -1,16 +1,17 @@
 /**
- * System Console API — Brain v2 Entry Point
+ * System Console API — Brain v3 Entry Point
  * ============================================
- * POST: Sends a message through the full Brain v2 pipeline:
- *   message → commandInterpreter → systemBrainV2 → directive → formatted response
+ * POST: Sends a message through the full Brain v3 pipeline:
+ *   message → commandInterpreter → systemBrainV3 → directive → formatted response
  *
- * This replaces direct AI calls with state-driven intelligence.
+ * v3 upgrades: autonomous reasoning, evolution integration,
+ * shadow coach review, cognitive constraints, slash commands.
  */
 
 import { getUserId } from "@/lib/auth";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import { interpretCommand } from "@/lib/core/commandInterpreter";
-import { processCommand } from "@/lib/core/systemBrainV2";
+import { processCommand } from "@/lib/core/systemBrainV3";
 import connectDB from "@/lib/mongodb";
 import SystemMessage from "@/models/SystemMessage";
 
@@ -35,9 +36,9 @@ export async function POST(req: Request) {
         const command = interpretCommand(message);
         console.log(`[Console] Command: ${command.type} | Agent: ${command.agent} | Confidence: ${command.confidence} | AI: ${command.requiresAI}`);
 
-        // ── Step 2: Process through Brain v2 ─────────────
+        // ── Step 2: Process through Brain v3 ─────────────
         const result = await processCommand(userId, command);
-        console.log(`[Console] Response: ${result.messages.length} messages | Agents: ${result.agentsInvolved.join(", ")} | AI: ${result.usedAI} | ${result.processingTimeMs}ms`);
+        console.log(`[Console] Response: ${result.messages.length} messages | Agents: ${result.agentsInvolved.join(", ")} | AI: ${result.usedAI} | Evolution: ${result.evolutionApplied} | Shadow: ${result.shadowCoachReviewed} | Cognitive: ${result.cognitiveConstrained} | ${result.processingTimeMs}ms`);
 
         // ── Step 3: Save agent messages for history ──────
         for (const msg of result.messages) {
@@ -63,6 +64,9 @@ export async function POST(req: Request) {
                 processingTimeMs: result.processingTimeMs,
                 agentsInvolved: result.agentsInvolved,
                 usedAI: result.usedAI,
+                evolutionApplied: result.evolutionApplied,
+                shadowCoachReviewed: result.shadowCoachReviewed,
+                cognitiveConstrained: result.cognitiveConstrained,
             },
         });
     } catch (error: any) {

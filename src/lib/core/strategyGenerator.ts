@@ -15,6 +15,7 @@ import type { SystemState } from "@/types";
 import { aiRouter } from "@/lib/ai/aiRouter";
 import { recallMemory, getCachedStrategy, storeStrategy } from "./systemMemory";
 import { buildAIContext } from "./contextBuilder";
+import { getStoredParams } from "./evolutionEngine";
 
 export interface DailyStrategy {
     morning: string[];
@@ -114,16 +115,29 @@ function generateRuleBasedStrategy(state: SystemState): DailyStrategy {
     const evening: string[] = [];
     let directive = "Discipline is built through consistency. Do not deviate from the plan.";
 
+    // v3: Load evolution parameters for adaptive strategy
+    let evoParams;
+    try {
+        // Synchronous — getStoredParams uses cached memory
+        evoParams = getStoredParams(null);
+    } catch {
+        evoParams = { focusPriority: "balanced", maxDailyTasks: 8, optimalTaskTime: "morning", streakProtectionMode: false, difficultyScaleThreshold: 6, interventionSensitivity: "medium" as const };
+    }
+
+    const maxTasks = evoParams.maxDailyTasks;
+
     // Morning: Priority tasks and weak habits
-    if (state.weakHabits.length > 0) {
+    if (state.weakHabits.length > 0 && (evoParams.focusPriority === "weak_habits" || evoParams.focusPriority === "balanced")) {
         morning.push(`Focus on weakest area: ${state.weakHabits[0]}`);
     }
     morning.push("Review today's quest list and plan your approach");
 
-    // Find high-difficulty habits for morning
-    const hardHabits = state.activeHabits.filter(h => h.difficulty === "hard");
-    if (hardHabits.length > 0) {
-        morning.push(`Complete hard quest: ${hardHabits[0].name}`);
+    // Find high-difficulty habits for morning (if timing says morning)
+    if (evoParams.optimalTaskTime === "morning" || evoParams.optimalTaskTime === "mixed") {
+        const hardHabits = state.activeHabits.filter(h => h.difficulty === "hard");
+        if (hardHabits.length > 0) {
+            morning.push(`Complete hard quest: ${hardHabits[0].name}`);
+        }
     }
 
     // Afternoon: Medium tasks and skill training
@@ -133,9 +147,9 @@ function generateRuleBasedStrategy(state: SystemState): DailyStrategy {
     }
     afternoon.push("Complete at least 2 quest subtasks");
 
-    // Check for skill training needs
+    // Check for skill training needs (evolution: skill_growth priority)
     const weakSkills = state.skillScores.filter(s => s.score < 50);
-    if (weakSkills.length > 0) {
+    if (weakSkills.length > 0 && (evoParams.focusPriority === "skill_growth" || evoParams.focusPriority === "balanced")) {
         afternoon.push(`Train weak skill: ${weakSkills[0].skill} (${weakSkills[0].score}/100)`);
     }
 
@@ -147,8 +161,22 @@ function generateRuleBasedStrategy(state: SystemState): DailyStrategy {
         evening.push(`Finish incomplete: ${incompleteHabits.slice(0, 2).map(h => h.name).join(", ")}`);
     }
 
-    // Adaptive directive based on state
-    if (state.behaviorAnalysis.trend === "declining") {
+    // v3: Cap total tasks to evolution max
+    const totalGenerated = morning.length + afternoon.length + evening.length;
+    if (totalGenerated > maxTasks) {
+        // Trim from evening first, then afternoon
+        while (evening.length > 1 && (morning.length + afternoon.length + evening.length) > maxTasks) {
+            evening.pop();
+        }
+        while (afternoon.length > 1 && (morning.length + afternoon.length + evening.length) > maxTasks) {
+            afternoon.pop();
+        }
+    }
+
+    // Adaptive directive based on state + evolution params
+    if (evoParams.streakProtectionMode && state.hunter.streak >= 7) {
+        directive = `${state.hunter.streak}-day streak PROTECTED. Complete minimum tasks to maintain the chain. No unnecessary risk.`;
+    } else if (state.behaviorAnalysis.trend === "declining") {
         directive = "Performance is DECLINING. Today's execution must be flawless. No excuses.";
     } else if (state.hunter.streak >= 7) {
         directive = `${state.hunter.streak}-day streak active. Maintain the chain. Break it and face consequences.`;

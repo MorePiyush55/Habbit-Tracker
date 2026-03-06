@@ -108,6 +108,58 @@ export async function runScheduledChecks(userId: string): Promise<SchedulerResul
             errors.push(`STREAK_RISK_CHECK: ${e.message}`);
         }
 
+        // 6. v3: Run autonomous Brain v3 processing
+        //    Push behavior analysis, strategy pregeneration, and evolution
+        //    through the full brain pipeline
+        try {
+            const { processAutonomousEvent } = await import("./systemBrainV3");
+
+            // Behavior analysis (generates ANALYST alerts)
+            const behaviorResult = await processAutonomousEvent(userId, "RUN_BEHAVIOR_ANALYSIS");
+            if (behaviorResult.messages.length > 0) {
+                checksRun.push("BRAIN_V3_BEHAVIOR_ANALYSIS");
+                for (const m of behaviorResult.messages) {
+                    await SystemMessage.create({
+                        userId,
+                        role: "system",
+                        content: `[${m.agent}] ${m.text}`,
+                        metadata: { autonomous: true, agent: m.agent },
+                    }).catch(() => {});
+                }
+            }
+
+            // Evolution / difficulty update
+            const evoResult = await processAutonomousEvent(userId, "UPDATE_DIFFICULTY");
+            if (evoResult.evolutionApplied) {
+                checksRun.push("BRAIN_V3_EVOLUTION");
+                eventsEmitted.push("EVOLUTION_APPLIED");
+                for (const m of evoResult.messages) {
+                    await SystemMessage.create({
+                        userId,
+                        role: "system",
+                        content: `[${m.agent}] ${m.text}`,
+                        metadata: { autonomous: true, agent: m.agent },
+                    }).catch(() => {});
+                }
+            }
+
+            // Cognitive load check
+            const cogResult = await processAutonomousEvent(userId, "CHECK_COGNITIVE_LOAD");
+            if (cogResult.messages.length > 0) {
+                checksRun.push("BRAIN_V3_COGNITIVE_CHECK");
+                for (const m of cogResult.messages) {
+                    await SystemMessage.create({
+                        userId,
+                        role: "system",
+                        content: `[${m.agent}] ${m.text}`,
+                        metadata: { autonomous: true, agent: m.agent },
+                    }).catch(() => {});
+                }
+            }
+        } catch (e: any) {
+            errors.push(`BRAIN_V3_AUTONOMOUS: ${e.message}`);
+        }
+
         // Track metrics
         await incrementMetrics(userId, "totalEventsProcessed", eventsEmitted.length);
 

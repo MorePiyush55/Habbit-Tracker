@@ -34,6 +34,9 @@ export type CommandType =
     | "REQUEST_WORKLOAD_CHECK"
     | "REQUEST_HELP"
     | "REQUEST_MOTIVATION"
+    | "REQUEST_TRAINING"
+    | "REQUEST_SIMULATION"
+    | "REQUEST_EVOLUTION"
     | "FREE_CHAT";
 
 export interface SystemCommand {
@@ -216,11 +219,77 @@ const INTENT_PATTERNS: IntentPattern[] = [
         requiresAI: true,
         confidence: 0.78,
     },
-];
+    // Training / Test
+    {
+        type: "REQUEST_TRAINING",
+        patterns: [
+            /\b(test|quiz|drill|exam|assess|practice)\b.*\b(me|my|skill|knowledge)\b/i,
+            /\b(generate|give|create).*(question|test|quiz)/i,
+            /\btrain me\b/i,
+        ],
+        agent: "TUTOR",
+        requiresAI: true,
+        confidence: 0.85,
+    },
+
+    // Simulation
+    {
+        type: "REQUEST_SIMULATION",
+        patterns: [
+            /\b(simulat|what if|scenario|project)\b/i,
+            /\bimproved strategy\b/i,
+            /\bcompare.*(current|future|projection)/i,
+        ],
+        agent: "ANALYST",
+        requiresAI: false,
+        confidence: 0.82,
+    },
+
+    // Evolution
+    {
+        type: "REQUEST_EVOLUTION",
+        patterns: [
+            /\b(evolution|evolve|self.?learn|adapt|parameter|rule.?update)\b/i,
+            /\bhow.*(system|ai).*(learn|adapt|evolv)/i,
+            /\bsystem rule/i,
+        ],
+        agent: "SYSTEM",
+        requiresAI: false,
+        confidence: 0.80,
+    },];
 
 // ============================================================
 // CORE: Interpret a chat message into a system command
 // ============================================================
+
+// ============================================================
+// SLASH COMMANDS — Direct command mapping
+// ============================================================
+
+const SLASH_COMMANDS: Record<string, {
+    type: CommandType;
+    agent: SystemCommand["agent"];
+    requiresAI: boolean;
+}> = {
+    "/tasks":     { type: "REQUEST_REMAINING_TASKS", agent: "SYSTEM", requiresAI: false },
+    "/completed": { type: "REQUEST_COMPLETED_TASKS", agent: "SYSTEM", requiresAI: false },
+    "/progress":  { type: "REQUEST_STATUS", agent: "SYSTEM", requiresAI: false },
+    "/status":    { type: "REQUEST_STATUS", agent: "SYSTEM", requiresAI: false },
+    "/strategy":  { type: "REQUEST_DAILY_STRATEGY", agent: "STRATEGIST", requiresAI: true },
+    "/plan":      { type: "REQUEST_DAILY_STRATEGY", agent: "STRATEGIST", requiresAI: true },
+    "/skills":    { type: "REQUEST_SKILL_REPORT", agent: "TUTOR", requiresAI: false },
+    "/analyze":   { type: "REQUEST_BEHAVIOR_ANALYSIS", agent: "ANALYST", requiresAI: true },
+    "/analyse":   { type: "REQUEST_BEHAVIOR_ANALYSIS", agent: "ANALYST", requiresAI: true },
+    "/debrief":   { type: "REQUEST_DEBRIEF", agent: "ANALYST", requiresAI: true },
+    "/predict":   { type: "REQUEST_PREDICTION", agent: "ANALYST", requiresAI: false },
+    "/simulate":  { type: "REQUEST_SIMULATION", agent: "ANALYST", requiresAI: false },
+    "/workload":  { type: "REQUEST_WORKLOAD_CHECK", agent: "SHADOW_COACH", requiresAI: false },
+    "/test":      { type: "REQUEST_TRAINING", agent: "TUTOR", requiresAI: true },
+    "/train":     { type: "REQUEST_TRAINING", agent: "TUTOR", requiresAI: true },
+    "/evolve":    { type: "REQUEST_EVOLUTION", agent: "SYSTEM", requiresAI: false },
+    "/help":      { type: "REQUEST_HELP", agent: "SYSTEM", requiresAI: false },
+    "/motivate":  { type: "REQUEST_MOTIVATION", agent: "SYSTEM", requiresAI: true },
+};
 
 export function interpretCommand(message: string): SystemCommand {
     const trimmed = message.trim();
@@ -228,7 +297,21 @@ export function interpretCommand(message: string): SystemCommand {
     // Extract entities before pattern matching
     const entities = extractEntities(trimmed);
 
-    // Match against patterns — highest confidence wins
+    // Step 0: Check for slash commands (highest priority)
+    const slashWord = trimmed.split(/\s+/)[0].toLowerCase();
+    if (slashWord.startsWith("/") && SLASH_COMMANDS[slashWord]) {
+        const slash = SLASH_COMMANDS[slashWord];
+        return {
+            type: slash.type,
+            confidence: 1.0,
+            originalMessage: trimmed,
+            extractedEntities: entities,
+            requiresAI: slash.requiresAI,
+            agent: slash.agent,
+        };
+    }
+
+    // Step 1: Match against NL patterns — highest confidence wins
     let bestMatch: {
         type: CommandType;
         confidence: number;
@@ -247,7 +330,7 @@ export function interpretCommand(message: string): SystemCommand {
                         requiresAI: intent.requiresAI,
                     };
                 }
-                break; // Found a match in this intent, move to next
+                break;
             }
         }
     }
@@ -313,16 +396,27 @@ function extractEntities(message: string): SystemCommand["extractedEntities"] {
 export function getAvailableCommands(): string {
     return `SYSTEM CONSOLE — Available Commands
 
-• "What tasks are remaining?" → View pending tasks
-• "What did I complete today?" → View completed tasks
-• "Give me a strategy" → Get daily training plan
-• "Show my stats" → View hunter status
-• "What are my weak skills?" → Skill proficiency report
-• "How am I performing?" → Behavior analysis
-• "Give me a debrief" → End-of-day summary
-• "Predict my future" → 30-day performance projection
-• "Am I overloaded?" → Workload assessment
-• "Motivate me" → System push
+Slash Commands:
+  /tasks      → View pending tasks
+  /completed  → View completed tasks
+  /progress   → Hunter status overview
+  /strategy   → Get daily training plan
+  /skills     → Skill proficiency report
+  /analyze    → Behavior analysis (30-day)
+  /debrief    → End-of-day mission summary
+  /predict    → 30-day performance projection
+  /simulate   → Life simulation with scenarios
+  /workload   → Cognitive load assessment
+  /test       → Generate skill training question
+  /evolve     → View system evolution parameters
+  /motivate   → System motivational push
+  /help       → This command list
 
-Or ask anything else — the System will respond.`;
+Natural Language:
+  "What tasks are remaining?" → View pending tasks
+  "How am I performing?" → Behavior analysis
+  "Am I overloaded?" → Workload assessment
+  "Test me on cryptography" → Skill drill
+
+Or ask anything — the System will respond.`;
 }

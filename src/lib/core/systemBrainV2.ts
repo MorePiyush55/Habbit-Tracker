@@ -416,6 +416,26 @@ Give a 2-3 sentence motivational push. Be commanding, not friendly. Reference th
     FREE_CHAT: async (cmd, state, memory, userId) => {
         return handleFreeChat(cmd, state, memory, userId);
     },
+
+    // ── v3 STUBS (handled by Brain v3, kept here for type safety) ──
+    REQUEST_TRAINING: async () => ({
+        messages: [msg("SYSTEM", "Training is handled by Brain v3. Upgrade in progress.")],
+        directives: [],
+        agents: ["SYSTEM"] as AgentRole[],
+        usedAI: false,
+    }),
+    REQUEST_SIMULATION: async () => ({
+        messages: [msg("SYSTEM", "Simulation is handled by Brain v3. Upgrade in progress.")],
+        directives: [],
+        agents: ["SYSTEM"] as AgentRole[],
+        usedAI: false,
+    }),
+    REQUEST_EVOLUTION: async () => ({
+        messages: [msg("SYSTEM", "Evolution status is handled by Brain v3. Upgrade in progress.")],
+        directives: [],
+        agents: ["SYSTEM"] as AgentRole[],
+        usedAI: false,
+    }),
 };
 
 // ============================================================
