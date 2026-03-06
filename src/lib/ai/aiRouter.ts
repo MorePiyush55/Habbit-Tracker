@@ -2,12 +2,13 @@ import { openRouterClient } from "./aiClient";
 
 type TaskType = "chat" | "notification" | "analysis" | "strategy" | "learning" | "tutor";
 
-// All free-tier models on OpenRouter — no credits required
+// All verified free-tier models on OpenRouter
 const MODELS = {
-    fast: "meta-llama/llama-3.1-8b-instruct:free",      // Chat, notifications
-    reason: "deepseek/deepseek-r1:free",                  // Analysis, strategy
-    tutor: "google/gemma-3-27b-it:free",                  // Learning, quizzes
-    fallback: "mistralai/mistral-7b-instruct:free",       // Universal fallback
+    fast: "meta-llama/llama-3.2-3b-instruct:free",       // Chat, notifications (verified free)
+    reason: "deepseek/deepseek-r1:free",                  // Analysis, strategy (verified free)
+    tutor: "google/gemma-3-27b-it:free",                  // Learning, quizzes (verified free)
+    tutor2: "google/gemma-3-12b-it:free",                 // Tutor fallback (verified free)
+    fallback: "meta-llama/llama-3.2-3b-instruct:free",   // Universal fallback (same as fast)
 };
 
 async function callModel(model: string, prompt: string): Promise<string> {
@@ -46,8 +47,8 @@ export async function aiRouter(taskType: TaskType, prompt: string): Promise<stri
         try {
             return await callModel(MODELS.tutor, prompt);
         } catch (e: any) {
-            console.warn("[AI Router] Gemma 3 rate-limited, trying fallback:", e?.message);
-            return await callModel(MODELS.fallback, prompt);
+            console.warn("[AI Router] Gemma 3 27B rate-limited, trying Gemma 3 12B:", e?.message);
+            return await callModel(MODELS.tutor2, prompt);
         }
     }
 
