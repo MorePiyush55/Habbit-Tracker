@@ -1,9 +1,4 @@
-import connectDB from "@/lib/mongodb";
-import User from "@/models/User";
-import DailyProgress from "@/models/DailyProgress";
-import SystemEvent from "@/models/SystemEvent";
-import SystemDecision from "@/models/SystemDecision";
-import SkillScore from "@/models/SkillScore";
+import { runBatchScheduledChecks } from "@/lib/core/systemScheduler";
 
 // Vercel Cron: runs every hour
 // In vercel.json: { "crons": [{ "path": "/api/cron/system-check", "schedule": "0 * * * *" }] }
@@ -16,110 +11,34 @@ export async function GET(req: Request) {
             return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        await connectDB();
+        console.log("[Cron] Starting autonomous system check...");
 
-        const today = new Date().toISOString().split("T")[0];
-        const now = new Date();
-        const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+        // Run the full scheduler across all active users
+        const result = await runBatchScheduledChecks();
 
-        // Get all active users
-        const users = await User.find({}).lean();
-        let eventsTriggered = 0;
+        const totalEvents = result.results.reduce((sum, r) => sum + r.eventsEmitted.length, 0);
+        const totalErrors = result.results.reduce((sum, r) => sum + r.errors.length, 0);
 
-        for (const user of users) {
-            const userId = user._id.toString();
-
-            // 1. INACTIVITY_WARNING — No progress entries today and it's past 2PM
-            if (now.getHours() >= 14) {
-                const todayProgress = await DailyProgress.findOne({ userId, date: today }).lean();
-                if (!todayProgress || (todayProgress as any).completionRate === 0) {
-                    const alreadyWarned = await SystemEvent.findOne({
-                        userId, eventType: "INACTIVITY_WARNING", date: today
-                    });
-                    if (!alreadyWarned) {
-                        await SystemEvent.create({
-                            userId,
-                            eventType: "INACTIVITY_WARNING",
-                            message: "[ALERT] Hunter. You have been inactive today. No quests completed. Resume training immediately. The System does not tolerate idle Hunters.",
-                            date: today
-                        });
-                        await SystemDecision.create({
-                            userId,
-                            decisionType: "INACTIVITY_CHECK",
-                            reason: "No progress detected today past 2PM",
-                            context: { completionRate: 0, currentHour: now.getHours() },
-                            result: { eventFired: "INACTIVITY_WARNING" },
-                            date: today
-                        });
-                        eventsTriggered++;
-                    }
-                }
-            }
-
-            // 2. SKILL_DEGRADATION — Skills not tested in 7+ days
-            const staleSkills = await SkillScore.find({
-                userId,
-                lastTested: { $lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
-            }).lean();
-
-            for (const skill of staleSkills) {
-                const alreadyWarned = await SystemEvent.findOne({
-                    userId, eventType: "SKILL_DEGRADATION", date: today,
-                    context: { $regex: skill.skill }
-                });
-                if (!alreadyWarned) {
-                    await SystemEvent.create({
-                        userId,
-                        eventType: "SKILL_DEGRADATION",
-                        message: `[WARNING] Hunter. Your ${skill.skill} knowledge has not been tested in over 7 days. Skill degradation detected. Current proficiency: ${skill.score}%. Resume training in this area immediately.`,
-                        context: skill.skill,
-                        date: today
-                    });
-                    eventsTriggered++;
-                }
-            }
-
-            // 3. DISCIPLINE_IMPROVEMENT — If discipline score improved by 10+ points this week
-            if ((user.disciplineScore || 50) >= 60) {
-                const lastWeekDecision = await SystemDecision.findOne({
-                    userId, decisionType: "BEHAVIOR_ANALYSIS",
-                    createdAt: { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
-                });
-                if (!lastWeekDecision) {
-                    const alreadyAcknowledged = await SystemEvent.findOne({
-                        userId, eventType: "DISCIPLINE_IMPROVEMENT", date: today
-                    });
-                    if (!alreadyAcknowledged && (user.disciplineScore || 50) >= 70) {
-                        await SystemEvent.create({
-                            userId,
-                            eventType: "DISCIPLINE_IMPROVEMENT",
-                            message: `[COMMENDATION] Hunter. Your discipline score has reached ${user.disciplineScore}%. This is acceptable progress. Do not become complacent. Maintain this standard.`,
-                            date: today
-                        });
-                        await SystemDecision.create({
-                            userId,
-                            decisionType: "BEHAVIOR_ANALYSIS",
-                            reason: `Discipline score at ${user.disciplineScore}%`,
-                            context: { disciplineScore: user.disciplineScore },
-                            result: { eventFired: "DISCIPLINE_IMPROVEMENT" },
-                            date: today
-                        });
-                        eventsTriggered++;
-                    }
-                }
-            }
-        }
-
-        console.log(`[Cron] System check complete. Users: ${users.length}, Events: ${eventsTriggered}`);
+        console.log(`[Cron] System check complete. Users: ${result.totalUsers}, Events: ${totalEvents}, Errors: ${totalErrors}, Duration: ${result.totalDuration}ms`);
 
         return Response.json({
             success: true,
-            usersChecked: users.length,
-            eventsTriggered,
-            timestamp: now.toISOString()
+            usersChecked: result.totalUsers,
+            processed: result.processed,
+            totalEvents,
+            totalErrors,
+            duration: result.totalDuration,
+            details: result.results.map((r) => ({
+                userId: r.userId.substring(0, 8) + "...",
+                checks: r.checksRun.length,
+                events: r.eventsEmitted,
+                errors: r.errors.length,
+                duration: r.duration,
+            })),
+            timestamp: new Date().toISOString(),
         });
     } catch (error: any) {
         console.error("[Cron] System check failed:", error.message);
-        return Response.json({ error: "Cron job failed" }, { status: 500 });
+        return Response.json({ error: "Cron job failed", detail: error.message }, { status: 500 });
     }
 }

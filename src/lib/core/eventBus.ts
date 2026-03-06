@@ -15,6 +15,10 @@ import type { SystemEventPayload, SystemEventType, SystemState, BrainDecisionRes
 import { buildSystemState } from "./systemState";
 import { processBrainEvent } from "./brainController";
 import { executeDirectives } from "./directiveExecutor";
+import { evaluateDirectives } from "./decisionEngine";
+import { recallMemory, rememberDecision, incrementMetrics } from "./systemMemory";
+import { evaluateIntervention } from "./interventionEngine";
+import { trackEvent } from "./observability";
 import connectDB from "@/lib/mongodb";
 import SystemEvent from "@/models/SystemEvent";
 
@@ -56,26 +60,54 @@ export async function emit(event: SystemEventPayload): Promise<BrainDecisionResu
         await connectDB();
 
         console.log(`[Event Bus] ⚡ ${event.type} | User: ${event.userId}`);
+        trackEvent();
 
-        // Step 1: Build system state
-        const state = await buildSystemState(event.userId);
+        // Step 1: Build system state + recall memory
+        const [state, memory] = await Promise.all([
+            buildSystemState(event.userId),
+            recallMemory(event.userId),
+        ]);
 
-        // Step 2: Route to System Brain
+        // Step 2: Route to System Brain (produces candidate directives)
         const decision = await processBrainEvent(event, state);
 
-        // Step 3: Execute all directives produced by the brain
-        if (decision.directives.length > 0) {
-            await executeDirectives(event.userId, decision.directives, state);
+        // Step 2.5: Check if intervention escalation is needed
+        if (event.type === "SESSION_START" || event.type === "WEAK_PROGRESS" || event.type === "INACTIVITY") {
+            try {
+                const intervention = await evaluateIntervention(event.userId, state, memory);
+                if (intervention.shouldIntervene) {
+                    decision.directives.push(...intervention.directives);
+                    console.log(`[Event Bus] Intervention L${intervention.level}: ${intervention.action}`);
+                }
+            } catch (e: any) {
+                console.error("[Event Bus] Intervention check failed (non-fatal):", e.message);
+            }
         }
 
-        // Step 4: Persist the event for audit trail
+        // Step 3: Decision Engine — evaluate, score, filter, and deduplicate directives
+        const evaluated = await evaluateDirectives(event.userId, decision.directives, state, memory);
+
+        console.log(`[Event Bus] Decision Engine: ${evaluated.approved.length} approved, ${evaluated.rejected.length} rejected, ${evaluated.conflicts.length} conflicts`);
+
+        // Step 4: Execute only APPROVED directives
+        if (evaluated.approved.length > 0) {
+            await executeDirectives(event.userId, evaluated.approved, state);
+        }
+
+        // Step 5: Persist the event for audit trail
         await persistEvent(event, decision);
 
+        // Step 6: Update metrics
+        try {
+            await incrementMetrics(event.userId, "totalEventsProcessed");
+        } catch { /* non-fatal */ }
+
         const processingTime = Date.now() - startTime;
-        console.log(`[Event Bus] ✓ ${event.type} processed in ${processingTime}ms | ${decision.directives.length} directives | AI: ${decision.metadata.aiCalled}`);
+        console.log(`[Event Bus] ✓ ${event.type} processed in ${processingTime}ms | ${evaluated.approved.length}/${decision.directives.length} directives | AI: ${decision.metadata.aiCalled}`);
 
         return {
             ...decision,
+            directives: evaluated.approved, // Return only approved directives
             metadata: {
                 ...decision.metadata,
                 processingTimeMs: processingTime,

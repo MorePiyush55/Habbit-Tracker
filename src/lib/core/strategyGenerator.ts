@@ -13,6 +13,8 @@
 
 import type { SystemState } from "@/types";
 import { aiRouter } from "@/lib/ai/aiRouter";
+import { recallMemory, getCachedStrategy, storeStrategy } from "./systemMemory";
+import { buildAIContext } from "./contextBuilder";
 
 export interface DailyStrategy {
     morning: string[];
@@ -22,42 +24,58 @@ export interface DailyStrategy {
     rawText: string;  // Full formatted text for display
     generatedAt: string;
     usedAI: boolean;
+    cached: boolean;   // Whether this was returned from cache
 }
 
 // ============================================================
-// GENERATE: Create daily strategy from system state
+// GENERATE: Create daily strategy from system state (with cache)
 // ============================================================
 export async function generateDailyStrategy(state: SystemState): Promise<DailyStrategy> {
+    // Strategy Cache (#6): Check if today's strategy is already cached
     try {
-        return await generateAIStrategy(state);
+        const memory = await recallMemory(state.hunter.userId);
+        const cached = getCachedStrategy(memory);
+        if (cached) {
+            console.log("[Strategy Generator] Returning cached strategy");
+            return { ...parseStrategyText(cached, memory.lastStrategy.usedAI), cached: true };
+        }
+    } catch {
+        // Cache miss — proceed to generate
+    }
+
+    let strategy: DailyStrategy;
+    try {
+        strategy = await generateAIStrategy(state);
     } catch (err: any) {
         console.error("[Strategy Generator] AI failed, using rule-based strategy:", err.message);
-        return generateRuleBasedStrategy(state);
+        strategy = generateRuleBasedStrategy(state);
     }
+
+    // Store in cache for today
+    try {
+        await storeStrategy(state.hunter.userId, strategy.rawText, strategy.usedAI);
+    } catch {
+        // Non-fatal
+    }
+
+    return strategy;
 }
 
 // ============================================================
 // AI-POWERED strategy generation
 // ============================================================
 async function generateAIStrategy(state: SystemState): Promise<DailyStrategy> {
+    // Use Context Builder (#7) for consistent AI prompt
+    let memoryForContext = null;
+    try {
+        memoryForContext = await recallMemory(state.hunter.userId);
+    } catch { /* proceed without memory */ }
+
+    const context = buildAIContext(state, memoryForContext);
+
     const prompt = `You are THE SYSTEM from Solo Leveling. Generate a daily training strategy for this Hunter.
 
-Hunter Data:
-${JSON.stringify(state.hunter, null, 2)}
-
-Current Habits:
-${JSON.stringify(state.activeHabits.map(h => ({ name: h.name, category: h.category, progress: h.progress + "%", difficulty: h.difficulty })), null, 2)}
-
-Weak Habits (need attention): ${state.weakHabits.join(", ") || "None identified"}
-Strong Habits: ${state.strongHabits.join(", ") || "None identified"}
-
-Behavior Analysis:
-- Trend: ${state.behaviorAnalysis.trend}
-- Avg Completion: ${state.behaviorAnalysis.avgCompletion}%
-- Active Days: ${state.behaviorAnalysis.activeDays}
-
-Skill Scores:
-${state.skillScores.map(s => `${s.skill}: ${s.score}/100 (${s.trend})`).join("\n") || "No skill data yet"}
+${context.full}
 
 RULES:
 - Create a structured plan with MORNING, AFTERNOON, and EVENING blocks.
@@ -150,6 +168,7 @@ function generateRuleBasedStrategy(state: SystemState): DailyStrategy {
         rawText,
         generatedAt: new Date().toISOString(),
         usedAI: false,
+        cached: false,
     };
 }
 
@@ -204,6 +223,7 @@ function parseStrategyText(text: string, usedAI: boolean): DailyStrategy {
         rawText: text,
         generatedAt: new Date().toISOString(),
         usedAI,
+        cached: false,
     };
 }
 
