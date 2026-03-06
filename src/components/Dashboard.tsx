@@ -178,18 +178,18 @@ export default function Dashboard() {
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="main-content">
-                    {/* System Chat */}
-                    <SystemChat />
-
-                    {/* Weekly Boss Raid — back in main column */}
+                    {/* 1. Weekly Boss Raid — TOP */}
                     <BossBattle
                         bossHP={userStats.weeklyBossHP}
                         isDefeated={userStats.bossDefeatedThisWeek}
                         currentStreak={userStats.currentStreak}
                     />
 
-                    {/* Daily Strategy */}
+                    {/* 2. Daily Strategy — MIDDLE */}
                     <DailyStrategyPanel />
+
+                    {/* 3. System Chat — BOTTOM */}
+                    <SystemChat />
                 </div>
 
                 <CreateQuestModal
