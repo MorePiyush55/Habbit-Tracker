@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import useSWR from "swr";
-import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar } from "lucide-react";
+import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar, BookOpen, Shield, Briefcase, TrendingUp, Pen } from "lucide-react";
 
 const goalsFetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -19,8 +19,10 @@ interface CreateQuestModalProps {
 
 export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: CreateQuestModalProps) {
     const [title, setTitle] = useState("");
-    const [category, setCategory] = useState("");
-    const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">("medium");
+    const [category, setCategory] = useState("Learning");
+    const [customCategory, setCustomCategory] = useState("");
+    const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard" | "custom">("medium");
+    const [customXp, setCustomXp] = useState(30);
     const subtaskIdRef = useRef(1);
     const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>([{id: 0, text: ""}]);
     const [scheduleType, setScheduleType] = useState<"daily" | "today" | "custom">("daily");
@@ -55,7 +57,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
         try {
             const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
-            const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
+            const xpReward = difficulty === "custom" ? customXp : difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
+            const finalCategory = category === "Custom" ? customCategory : category;
 
             const isDaily = scheduleType === "daily";
             const todayStr = new Date().toISOString().split("T")[0];
@@ -63,8 +66,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
             const payload: Record<string, unknown> = {
                 title,
-                category,
-                difficulty,
+                category: finalCategory,
+                difficulty: difficulty === "custom" ? "custom" : difficulty,
                 xpReward,
                 subtasks: validSubtasks,
                 isDaily,
@@ -86,8 +89,10 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
             // Reset form
             setTitle("");
-            setCategory("");
+            setCategory("Learning");
+            setCustomCategory("");
             setDifficulty("medium");
+            setCustomXp(30);
             setScheduleType("daily");
             subtaskIdRef.current = 1;
             setSubtasks([{id: 0, text: ""}]);
@@ -127,33 +132,79 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         />
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
+                    <div className="form-group">
+                        <span style={{ fontSize: 'inherit', fontWeight: 500 }}>Category</span>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
+                            {(["Learning", "Cybersecurity", "Career", "Business", "Custom"] as const).map(cat => {
+                                const icons = { Learning: <BookOpen size={14} />, Cybersecurity: <Shield size={14} />, Career: <Briefcase size={14} />, Business: <TrendingUp size={14} />, Custom: <Pen size={14} /> };
+                                return (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => setCategory(cat)}
+                                        style={{
+                                            display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                            padding: "8px 4px", borderRadius: 8, cursor: "pointer", fontSize: "0.72rem",
+                                            border: category === cat ? "1.5px solid var(--accent-green)" : "1px solid rgba(255,255,255,0.1)",
+                                            background: category === cat ? "rgba(0,255,136,0.08)" : "rgba(255,255,255,0.03)",
+                                            color: category === cat ? "var(--accent-green)" : "var(--text-muted)",
+                                            transition: "border-color 0.2s, background 0.2s, color 0.2s",
+                                        }}
+                                    >
+                                        {icons[cat]}
+                                        <strong>{cat}</strong>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {category === "Custom" && (
                         <div className="form-group">
-                            <label htmlFor="create-quest-category">Category</label>
+                            <label htmlFor="create-quest-custom-cat">Custom Category</label>
                             <input
-                                id="create-quest-category"
+                                id="create-quest-custom-cat"
                                 type="text"
                                 required
-                                value={category}
-                                onChange={e => setCategory(e.target.value)}
-                                placeholder="e.g. Learning"
+                                value={customCategory}
+                                onChange={e => setCustomCategory(e.target.value)}
+                                placeholder="e.g. Health, Music"
                                 className="game-input"
                             />
                         </div>
+                    )}
 
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                         <div className="form-group">
                             <label htmlFor="create-quest-difficulty">Difficulty</label>
                             <select
                                 id="create-quest-difficulty"
                                 value={difficulty}
-                                onChange={e => setDifficulty(e.target.value as any)}
+                                onChange={e => setDifficulty(e.target.value as "small" | "medium" | "hard" | "custom")}
                                 className="game-input"
                             >
                                 <option value="small">E-Rank (10 XP)</option>
                                 <option value="medium">C-Rank (25 XP)</option>
                                 <option value="hard">A-Rank (50 XP)</option>
+                                <option value="custom">Custom XP</option>
                             </select>
                         </div>
+
+                        {difficulty === "custom" && (
+                            <div className="form-group">
+                                <label htmlFor="create-quest-xp">XP Reward</label>
+                                <input
+                                    id="create-quest-xp"
+                                    type="number"
+                                    required
+                                    min={1}
+                                    max={500}
+                                    value={customXp}
+                                    onChange={e => setCustomXp(Number(e.target.value))}
+                                    className="game-input"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
