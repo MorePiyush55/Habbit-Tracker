@@ -188,10 +188,7 @@ export default function Dashboard() {
                     currentStreak={userStats.currentStreak}
                 />
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "-10px" }}>
-                    <h2 className="section-title" style={{ margin: 0 }}>
-                        <span className="section-title-icon">📜</span> TODAY'S QUESTS
-                    </h2>
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "-10px" }}>
                     <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
                         + Add Daily Task
                     </button>

@@ -26,8 +26,12 @@ function checkRateLimit(userId: string): boolean {
 async function callGemini(prompt: string): Promise<string> {
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    // Strip markdown code fences if present
-    return text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    // Extract everything between the first '{' and the last '}'
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+        return match[0];
+    }
+    return text.trim();
 }
 
 export async function generateWeeklyReport(userId: string, weekData: unknown) {

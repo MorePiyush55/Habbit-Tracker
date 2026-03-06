@@ -21,6 +21,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [subtasks, setSubtasks] = useState<string[]>([""]);
     const [deadline, setDeadline] = useState("");
     const [linkedGoalId, setLinkedGoalId] = useState("");
+    const [isDaily, setIsDaily] = useState(true);
     const [availableGoals, setAvailableGoals] = useState<Goal[]>([]);
 
     const [loading, setLoading] = useState(false);
@@ -67,10 +68,11 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                 category,
                 difficulty,
                 xpReward,
-                subtasks: validSubtasks
+                subtasks: validSubtasks,
+                isDaily
             };
 
-            if (deadline) payload.deadline = deadline;
+            if (!isDaily && deadline) payload.deadline = deadline;
             if (linkedGoalId) payload.linkedGoalId = linkedGoalId;
 
             const res = await fetch("/api/habits", {
@@ -153,17 +155,32 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                         <div className="form-group">
-                            <label>Deadline (Optional)</label>
-                            <input
-                                type="date"
-                                value={deadline}
-                                onChange={e => setDeadline(e.target.value)}
-                                min={new Date().toISOString().split("T")[0]}
-                                className="game-input"
-                            />
+                            <label>Schedule</label>
+                            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={isDaily}
+                                    onChange={(e) => setIsDaily(e.target.checked)}
+                                    className="game-checkbox"
+                                />
+                                Make Daily Repeating Task
+                            </label>
                         </div>
 
-                        <div className="form-group">
+                        {!isDaily && (
+                            <div className="form-group">
+                                <label>Deadline (One-Time Task)</label>
+                                <input
+                                    type="date"
+                                    value={deadline}
+                                    onChange={e => setDeadline(e.target.value)}
+                                    min={new Date().toISOString().split("T")[0]}
+                                    className="game-input"
+                                />
+                            </div>
+                        )}
+
+                        <div className="form-group" style={{ gridColumn: isDaily ? "1 / -1" : "auto" }}>
                             <label>Link to Goal (Optional)</label>
                             <select
                                 value={linkedGoalId}
@@ -212,7 +229,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

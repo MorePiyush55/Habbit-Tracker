@@ -25,6 +25,7 @@ export async function createHabit(userId: string, data: {
     subtasks?: string[];
     deadline?: string;
     linkedGoalId?: string;
+    isDaily?: boolean;
 }) {
     await connectDB();
 
@@ -39,6 +40,7 @@ export async function createHabit(userId: string, data: {
         xpReward: data.xpReward,
         order: data.order || 0,
         isActive: true,
+        isDaily: data.isDaily ?? true,
         totalSubtasks: totalSubtasksCount,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
         linkedGoalId: data.linkedGoalId || undefined

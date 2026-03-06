@@ -105,8 +105,9 @@ export async function POST(req: Request) {
             penalty: penaltyData
         });
 
-    } catch (error) {
-        return handleError(error);
+    } catch (error: any) {
+        console.error("System Chat API Error:", error.message || error);
+        return Response.json({ error: error.message || "Failed to communicate with the System." }, { status: 500 });
     }
 }
 
