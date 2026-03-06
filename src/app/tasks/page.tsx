@@ -4,28 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import QuestPanel from "@/components/game/QuestPanel";
+import type { Quest } from "@/components/game/QuestPanel";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
+import EditQuestModal from "@/components/game/EditQuestModal";
 import AppNav from "@/components/AppNav";
 import { ListChecks, Loader2 } from "lucide-react";
-
-interface Subtask {
-    _id: string;
-    title: string;
-    order: number;
-    completed: boolean;
-    xpEarned: number;
-}
-
-interface Quest {
-    _id: string;
-    title: string;
-    category: string;
-    difficulty: string;
-    xpReward: number;
-    subtasks: Subtask[];
-    completionPercent: number;
-    isFullyCompleted: boolean;
-}
 
 export default function TasksPage() {
     const { data: session, status } = useSession();
@@ -34,6 +17,7 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -105,6 +89,37 @@ export default function TasksPage() {
         } catch {
             await fetchQuests();
         }
+    };
+
+    const handleEditQuest = (quest: Quest) => {
+        setEditingQuest(quest);
+    };
+
+    const handleToggleMainTask = async (habitId: string, completed: boolean) => {
+        setToggling(true);
+        // Optimistic update
+        setQuests((prev) =>
+            prev.map((q) => {
+                if (q._id !== habitId) return q;
+                return {
+                    ...q,
+                    completionPercent: completed ? 100 : 0,
+                    isFullyCompleted: completed,
+                };
+            })
+        );
+
+        try {
+            const res = await fetch("/api/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ habitId, subtaskId: "", completed, date: today }),
+            });
+            if (res.ok) await fetchQuests();
+        } catch {
+            await fetchQuests();
+        }
+        setToggling(false);
     };
 
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
@@ -197,6 +212,8 @@ export default function TasksPage() {
                         date={today}
                         onToggleSubtask={handleToggleSubtask}
                         onDeleteQuest={handleDeleteQuest}
+                        onEditQuest={handleEditQuest}
+                        onToggleMainTask={handleToggleMainTask}
                         loading={toggling}
                     />
                 </div>
@@ -207,6 +224,14 @@ export default function TasksPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onQuestCreated={fetchQuests}
             />
+
+            {editingQuest && (
+                <EditQuestModal
+                    quest={editingQuest}
+                    onClose={() => setEditingQuest(null)}
+                    onQuestUpdated={fetchQuests}
+                />
+            )}
         </div>
     );
 }

@@ -89,9 +89,31 @@ export async function updateHabit(habitId: string, data: Partial<{
     xpReward: number;
     order: number;
     isActive: boolean;
+    subtasks: string[];
 }>) {
     await connectDB();
-    return Habit.findByIdAndUpdate(habitId, data, { new: true }).lean();
+
+    // Extract subtasks separately — they live in a different collection
+    const { subtasks: newSubtasks, ...habitFields } = data;
+
+    const habit = await Habit.findByIdAndUpdate(habitId, habitFields, { new: true }).lean();
+
+    // If subtasks were provided, replace them
+    if (newSubtasks !== undefined) {
+        await Subtask.deleteMany({ habitId });
+        if (newSubtasks.length > 0) {
+            const subtaskDocs = newSubtasks.map((title, index) => ({
+                habitId,
+                title,
+                order: index,
+            }));
+            await Subtask.insertMany(subtaskDocs);
+        }
+        // Update totalSubtasks on the habit
+        await Habit.findByIdAndUpdate(habitId, { totalSubtasks: newSubtasks.length });
+    }
+
+    return habit;
 }
 
 export async function deleteHabit(habitId: string, userId?: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Scroll, Zap, Trash2 } from "lucide-react";
+import { ChevronDown, Scroll, Zap, Trash2, Pencil } from "lucide-react";
 
 interface Subtask {
     _id: string;
@@ -11,7 +11,7 @@ interface Subtask {
     xpEarned: number;
 }
 
-interface Quest {
+export interface Quest {
     _id: string;
     title: string;
     category: string;
@@ -27,10 +27,12 @@ interface QuestPanelProps {
     date: string;
     onToggleSubtask: (habitId: string, subtaskId: string, completed: boolean) => void;
     onDeleteQuest?: (habitId: string) => void;
+    onEditQuest?: (quest: Quest) => void;
+    onToggleMainTask?: (habitId: string, completed: boolean) => void;
     loading: boolean;
 }
 
-export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQuest, loading }: QuestPanelProps) {
+export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQuest, onEditQuest, onToggleMainTask, loading }: QuestPanelProps) {
     const [expandedQuests, setExpandedQuests] = useState<Set<string>>(new Set());
 
     const toggleExpand = (questId: string) => {
@@ -76,8 +78,24 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                             className={`quest-item glass-card ${quest.isFullyCompleted ? "completed" : ""}`}
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
-                            <div className="quest-header" onClick={() => toggleExpand(quest._id)}>
-                                <div className="quest-info">
+                            <div className="quest-header" onClick={() => quest.subtasks.length > 0 ? toggleExpand(quest._id) : undefined}>
+                                <div className="quest-info" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    {/* Main task checkbox for quests with no subtasks */}
+                                    {quest.subtasks.length === 0 && onToggleMainTask && (
+                                        <input
+                                            type="checkbox"
+                                            className="quest-checkbox"
+                                            checked={quest.isFullyCompleted}
+                                            disabled={loading}
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                onToggleMainTask(quest._id, e.target.checked);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ flexShrink: 0 }}
+                                        />
+                                    )}
+                                    <div>
                                     <div className="quest-title">
                                         {quest.isFullyCompleted ? "✅ " : ""}
                                         {quest.title}
@@ -93,8 +111,40 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                             {quest.completionPercent}%
                                         </span>
                                     </div>
+                                    </div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    {onEditQuest && (
+                                        <button
+                                            aria-label="Edit quest"
+                                            title="Edit quest"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onEditQuest(quest);
+                                            }}
+                                            style={{
+                                                background: "none",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                padding: 4,
+                                                borderRadius: 6,
+                                                color: "var(--text-muted)",
+                                                transition: "color 0.2s, background 0.2s",
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.color = "var(--accent-blue)";
+                                                e.currentTarget.style.background = "rgba(59,130,246,0.1)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.color = "var(--text-muted)";
+                                                e.currentTarget.style.background = "none";
+                                            }}
+                                        >
+                                            <Pencil size={15} />
+                                        </button>
+                                    )}
                                     {onDeleteQuest && (
                                         <button
                                             className="quest-delete-btn"
@@ -129,12 +179,14 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                             <Trash2 size={16} />
                                         </button>
                                     )}
-                                    <button
-                                        className={`quest-expand ${isExpanded ? "open" : ""}`}
-                                        aria-label="Toggle subtasks"
-                                    >
-                                        <ChevronDown size={20} />
-                                    </button>
+                                    {quest.subtasks.length > 0 && (
+                                        <button
+                                            className={`quest-expand ${isExpanded ? "open" : ""}`}
+                                            aria-label="Toggle subtasks"
+                                        >
+                                            <ChevronDown size={20} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 

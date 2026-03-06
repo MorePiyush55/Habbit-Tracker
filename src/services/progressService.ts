@@ -31,6 +31,26 @@ export async function getTodayProgress(userId: string, date: string) {
         const habitSubtasks = subtasks.filter(
             (s) => s.habitId.toString() === habit._id.toString()
         );
+
+        // Handle habits with no subtasks — use main task entry
+        if (habitSubtasks.length === 0) {
+            const mainEntry = entries.find(
+                (e) => e.habitId?.toString() === habit._id.toString() && (!e.subtaskId || e.subtaskId.toString() === "")
+            );
+            const isCompleted = mainEntry?.completed || false;
+            return {
+                _id: habit._id.toString(),
+                title: habit.title,
+                category: habit.category,
+                difficulty: habit.difficulty,
+                xpReward: habit.xpReward,
+                order: habit.order,
+                subtasks: [],
+                completionPercent: isCompleted ? 100 : 0,
+                isFullyCompleted: isCompleted,
+            };
+        }
+
         const subtasksWithProgress = habitSubtasks.map((sub) => {
             const entry = entries.find(
                 (e) => e.subtaskId?.toString() === sub._id.toString()
@@ -45,7 +65,7 @@ export async function getTodayProgress(userId: string, date: string) {
         });
 
         const completedCount = subtasksWithProgress.filter((s) => s.completed).length;
-        const totalCount = subtasksWithProgress.length || 1;
+        const totalCount = subtasksWithProgress.length;
         const completionPercent = Math.round((completedCount / totalCount) * 100);
         const isFullyCompleted = completionPercent === 100;
 
