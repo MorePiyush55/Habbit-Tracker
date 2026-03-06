@@ -40,7 +40,10 @@ function getStaticFallback(eventType: string): string {
         WEAK_PROGRESS: "[WARNING] Progress below acceptable threshold. Increase your output immediately.",
         BOSS_DEFEATED: "[COMMENDATION] The Discipline Titan has fallen. But the next one will be stronger.",
         LEVEL_UP: "[NOTICE] Power level increased. New expectations have been set. Do not disappoint.",
-        ALL_TASKS_DONE: "[COMMENDATION] All quests completed. Adequate. Maintain this standard tomorrow."
+        ALL_TASKS_DONE: "[COMMENDATION] All quests completed. Adequate. Maintain this standard tomorrow.",
+        SKILL_DEGRADATION: "[WARNING] Hunter, a skill has not been tested in over 7 days. Knowledge is deteriorating.",
+        INACTIVITY_WARNING: "[ALERT] Hunter. You have been inactive today. Resume training immediately.",
+        DISCIPLINE_IMPROVEMENT: "[COMMENDATION] Your discipline score is improving. Do not become complacent."
     };
     return fallbacks[eventType] || "[NOTICE] System event detected.";
 }

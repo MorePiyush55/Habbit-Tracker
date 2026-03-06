@@ -3,6 +3,8 @@ import Habit from "@/models/Habit";
 import User from "@/models/User";
 import BehaviorLog from "@/models/BehaviorLog";
 import GeneratedQuest from "@/models/GeneratedQuest";
+import SystemDecision from "@/models/SystemDecision";
+import SkillScore from "@/models/SkillScore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -46,7 +48,7 @@ function extractJSON(text: string): any {
 // ============================================================
 export async function systemDecision(
     userId: string,
-    actionType: "GENERATE_QUESTS" | "DAILY_STRATEGY" | "ANALYZE_BEHAVIOR" | "DIFFICULTY_CHECK",
+    actionType: "GENERATE_QUESTS" | "DAILY_STRATEGY" | "ANALYZE_BEHAVIOR" | "DIFFICULTY_CHECK" | "BOSS_ADJUSTMENT",
     context: Record<string, any>
 ): Promise<any> {
     await connectDB();
@@ -87,18 +89,44 @@ export async function systemDecision(
         ...context
     };
 
+    let result;
+    const today = new Date().toISOString().split("T")[0];
+
     switch (actionType) {
         case "GENERATE_QUESTS":
-            return generateQuests(userId, universalContext);
+            result = await generateQuests(userId, universalContext);
+            break;
         case "DAILY_STRATEGY":
-            return generateDailyStrategy(universalContext);
+            result = await generateDailyStrategy(universalContext);
+            break;
         case "ANALYZE_BEHAVIOR":
-            return analyzeBehavior(universalContext);
+            result = await analyzeBehavior(universalContext);
+            break;
         case "DIFFICULTY_CHECK":
-            return checkDifficultyScaling(userId, universalContext);
+            result = await checkDifficultyScaling(userId, universalContext);
+            break;
+        case "BOSS_ADJUSTMENT":
+            result = await adjustBossDifficulty(userId, universalContext);
+            break;
         default:
             throw new Error(`Unknown action: ${actionType}`);
     }
+
+    // Log every decision for transparency
+    try {
+        await SystemDecision.create({
+            userId,
+            decisionType: actionType,
+            reason: `System Brain executed: ${actionType}`,
+            context: { hunter: universalContext.hunter },
+            result: typeof result === 'string' ? { text: result.substring(0, 200) } : { summary: JSON.stringify(result).substring(0, 200) },
+            date: today
+        });
+    } catch (logErr: any) {
+        console.error("[System Brain] Decision log failed (non-fatal):", logErr.message);
+    }
+
+    return result;
 }
 
 // ============================================================
@@ -302,4 +330,36 @@ async function checkDifficultyScaling(userId: string, ctx: any) {
     }
 
     return { scaledHabits, count: scaledHabits.length };
+}
+
+// ============================================================
+// ACTION: Dynamic Boss Adjustment
+// ============================================================
+async function adjustBossDifficulty(userId: string, ctx: any) {
+    const disciplineScore = ctx.hunter.disciplineScore || 50;
+
+    // Boss HP scales: 300 (low discipline) to 800 (high discipline)
+    const baseBossHP = 500;
+    const scaledHP = Math.round(baseBossHP * (0.6 + (disciplineScore / 100) * 0.8));
+
+    // Boss name evolves with difficulty
+    const bossNames = [
+        { threshold: 300, name: "Shadow Imp" },
+        { threshold: 450, name: "Discipline Titan" },
+        { threshold: 600, name: "Iron Warden" },
+        { threshold: 700, name: "The Procrastination Overlord" },
+        { threshold: 800, name: "Shadow Monarch's Trial" }
+    ];
+
+    const boss = bossNames.reverse().find(b => scaledHP >= b.threshold) || bossNames[0];
+
+    await User.findByIdAndUpdate(userId, {
+        weeklyBossHP: scaledHP
+    });
+
+    return {
+        bossName: boss.name,
+        bossHP: scaledHP,
+        basedOnDiscipline: disciplineScore
+    };
 }

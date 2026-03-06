@@ -1,11 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Zap, X, ChevronRight } from "lucide-react";
+import { Zap, X, ChevronRight, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 interface TrainingQuiz {
     topic: string;
     question: string;
+    difficulty?: string;
+    hint?: string;
+}
+
+interface GradeResult {
+    correct: boolean;
+    score: number;
+    feedback: string;
+    correctAnswer: string;
+    skillScore: number;
 }
 
 interface DailyDebrief {
@@ -18,17 +28,21 @@ interface DailyDebrief {
 export default function ActiveTrainingUI() {
     const [quiz, setQuiz] = useState<TrainingQuiz | null>(null);
     const [debrief, setDebrief] = useState<DailyDebrief | null>(null);
+    const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
     const [answerReq, setAnswerReq] = useState("");
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [grading, setGrading] = useState(false);
 
     // Auto-trigger training logic
     useEffect(() => {
-        // In a real app, this might trigger based on time of day (e.g. night for debrief)
-        // For testing, we'll try to fetch a training quiz if there's a weak topic.
         const checkTraining = async () => {
             try {
-                const res = await fetch("/api/system/training", { method: "POST" });
+                const res = await fetch("/api/system/test-user", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "generate" })
+                });
                 const data = await res.json();
                 if (data.quiz) {
                     setQuiz(data.quiz);
@@ -39,9 +53,41 @@ export default function ActiveTrainingUI() {
             }
         };
 
-        // Call checkTraining right away to see if there's anything to do
         checkTraining();
     }, []);
+
+    const handleSubmitAnswer = async () => {
+        if (!answerReq.trim() || !quiz) return;
+
+        setGrading(true);
+        try {
+            const res = await fetch("/api/system/test-user", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "grade",
+                    skill: quiz.topic,
+                    question: quiz.question,
+                    answer: answerReq
+                })
+            });
+            const data = await res.json();
+            if (data.result) {
+                setGradeResult(data.result);
+            }
+        } catch (err) {
+            console.error("Grading failed:", err);
+            setGradeResult({
+                correct: false,
+                score: 0,
+                feedback: "SYSTEM NOTICE: Grading failed. Answer recorded.",
+                correctAnswer: "Evaluation unavailable.",
+                skillScore: 0
+            });
+        } finally {
+            setGrading(false);
+        }
+    };
 
     const fetchDebrief = async () => {
         setLoading(true);
@@ -50,7 +96,8 @@ export default function ActiveTrainingUI() {
             const data = await res.json();
             if (data.debrief) {
                 setDebrief(data.debrief);
-                setQuiz(null); // Switch view
+                setQuiz(null);
+                setGradeResult(null);
                 setIsOpen(true);
             }
         } catch (err) {
@@ -58,6 +105,13 @@ export default function ActiveTrainingUI() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const resetQuiz = () => {
+        setQuiz(null);
+        setGradeResult(null);
+        setAnswerReq("");
+        setIsOpen(false);
     };
 
     if (!isOpen) {
@@ -71,7 +125,7 @@ export default function ActiveTrainingUI() {
     return (
         <div className="active-training-overlay">
             <div className="active-training-panel glass-card">
-                <button className="icon-btn close-btn" onClick={() => setIsOpen(false)}>
+                <button className="icon-btn close-btn" onClick={resetQuiz}>
                     <X size={20} />
                 </button>
 
@@ -82,13 +136,23 @@ export default function ActiveTrainingUI() {
                     </h2>
                 </div>
 
-                {quiz && (
+                {quiz && !gradeResult && (
                     <div className="training-content typewriter-effect">
                         <p className="system-text">[ ACTIVE TRAINING ACTIVATED: {quiz.topic.toUpperCase()} ]</p>
-                        <p className="system-text">Hunter, your knowledge in {quiz.topic} is weak.</p>
+                        <p className="system-text">Hunter, your knowledge in {quiz.topic} is being tested.</p>
+                        {quiz.difficulty && (
+                            <div style={{ fontSize: "0.7rem", color: "#888", letterSpacing: "2px", marginBottom: 8 }}>
+                                DIFFICULTY: {quiz.difficulty.toUpperCase()}
+                            </div>
+                        )}
                         <div className="quiz-box">
                             <p>{quiz.question}</p>
                         </div>
+                        {quiz.hint && (
+                            <div style={{ fontSize: "0.75rem", color: "#ffaa00", fontStyle: "italic", margin: "8px 0" }}>
+                                Hint: {quiz.hint}
+                            </div>
+                        )}
                         <div className="quiz-input-area">
                             <input
                                 type="text"
@@ -96,14 +160,76 @@ export default function ActiveTrainingUI() {
                                 onChange={e => setAnswerReq(e.target.value)}
                                 placeholder="State your answer..."
                                 className="game-input"
+                                disabled={grading}
+                                onKeyDown={e => e.key === "Enter" && handleSubmitAnswer()}
                             />
-                            <button className="btn btn-danger" onClick={() => {
-                                setQuiz(null); // In v2, we'd send this back to AI to grade
-                                setIsOpen(false);
-                            }}>
-                                Submit <ChevronRight size={16} />
+                            <button className="btn btn-danger" onClick={handleSubmitAnswer} disabled={grading || !answerReq.trim()}>
+                                {grading ? <Loader2 size={16} className="spinning" /> : <>Submit <ChevronRight size={16} /></>}
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {gradeResult && (
+                    <div className="training-content typewriter-effect">
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                            {gradeResult.correct
+                                ? <CheckCircle size={24} style={{ color: "#00ff88" }} />
+                                : <XCircle size={24} style={{ color: "#ff4444" }} />
+                            }
+                            <span style={{
+                                fontSize: "1.1rem",
+                                fontWeight: 700,
+                                color: gradeResult.correct ? "#00ff88" : "#ff4444"
+                            }}>
+                                {gradeResult.correct ? "CORRECT" : "INCORRECT"}
+                            </span>
+                            <span style={{ fontSize: "0.8rem", color: "#888", marginLeft: "auto" }}>
+                                Score: {gradeResult.score}/100
+                            </span>
+                        </div>
+
+                        <div style={{
+                            background: "rgba(0,0,0,0.3)",
+                            borderRadius: 8,
+                            padding: 14,
+                            borderLeft: `3px solid ${gradeResult.correct ? "#00ff88" : "#ff4444"}`,
+                            marginBottom: 12
+                        }}>
+                            <div style={{ fontSize: "0.7rem", letterSpacing: "2px", color: "#8b5cf6", marginBottom: 6 }}>
+                                SYSTEM VERDICT
+                            </div>
+                            <div style={{ color: "#d0d0d0", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                {gradeResult.feedback}
+                            </div>
+                        </div>
+
+                        {!gradeResult.correct && gradeResult.correctAnswer && (
+                            <div style={{
+                                background: "rgba(0, 255, 136, 0.05)",
+                                borderRadius: 8,
+                                padding: 14,
+                                borderLeft: "3px solid #00ff88",
+                                marginBottom: 12
+                            }}>
+                                <div style={{ fontSize: "0.7rem", letterSpacing: "2px", color: "#00ff88", marginBottom: 6 }}>
+                                    CORRECT ANSWER
+                                </div>
+                                <div style={{ color: "#d0d0d0", lineHeight: 1.6 }}>
+                                    {gradeResult.correctAnswer}
+                                </div>
+                            </div>
+                        )}
+
+                        {gradeResult.skillScore > 0 && (
+                            <div style={{ fontSize: "0.75rem", color: "#888", textAlign: "center" }}>
+                                Skill Proficiency: {gradeResult.skillScore}%
+                            </div>
+                        )}
+
+                        <button className="btn btn-primary" onClick={resetQuiz} style={{ width: "100%", marginTop: 12 }}>
+                            Acknowledged
+                        </button>
                     </div>
                 )}
 

@@ -5,7 +5,7 @@ const SystemEventSchema = new Schema(
         userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
         eventType: {
             type: String,
-            enum: ["TASK_FAILED", "STREAK_BROKEN", "GOAL_COMPLETED", "WEAK_PROGRESS", "BOSS_DEFEATED", "LEVEL_UP", "ALL_TASKS_DONE"],
+            enum: ["TASK_FAILED", "STREAK_BROKEN", "GOAL_COMPLETED", "WEAK_PROGRESS", "BOSS_DEFEATED", "LEVEL_UP", "ALL_TASKS_DONE", "SKILL_DEGRADATION", "INACTIVITY_WARNING", "DISCIPLINE_IMPROVEMENT"],
             required: true
         },
         message: { type: String, required: true },
