@@ -8,6 +8,8 @@ export const habitSchema = z.object({
     order: z.number().optional(),
     isActive: z.boolean().optional(),
     subtasks: z.array(z.string()).optional(),
+    deadline: z.string().optional(),
+    linkedGoalId: z.string().optional(),
 });
 
 export const subtaskSchema = z.object({

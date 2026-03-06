@@ -9,6 +9,12 @@ const HabitSchema = new Schema(
         xpReward: { type: Number, required: true },
         order: { type: Number, default: 0 },
         isActive: { type: Boolean, default: true },
+        // Phase 5 additions for advanced tracking
+        totalSubtasks: { type: Number, default: 0 },
+        completedSubtasks: { type: Number, default: 0 },
+        progressPercent: { type: Number, default: 0 },
+        deadline: { type: Date },
+        linkedGoalId: { type: Schema.Types.ObjectId, ref: "Goal" }
     },
     { timestamps: true }
 );

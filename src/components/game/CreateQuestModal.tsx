@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
+
+interface Goal {
+    _id: string;
+    title: string;
+}
 
 interface CreateQuestModalProps {
     isOpen: boolean;
@@ -14,8 +19,23 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [category, setCategory] = useState("");
     const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard">("medium");
     const [subtasks, setSubtasks] = useState<string[]>([""]);
+    const [deadline, setDeadline] = useState("");
+    const [linkedGoalId, setLinkedGoalId] = useState("");
+    const [availableGoals, setAvailableGoals] = useState<Goal[]>([]);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (isOpen) {
+            fetch("/api/goals")
+                .then(res => res.json())
+                .then(data => {
+                    if (data.goals) setAvailableGoals(data.goals);
+                })
+                .catch(err => console.error("Error fetching goals:", err));
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -39,21 +59,24 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
         setError("");
 
         try {
-            // Filter out empty subtasks
             const validSubtasks = subtasks.filter(s => s.trim() !== "");
-
             const xpReward = difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
+
+            const payload: any = {
+                title,
+                category,
+                difficulty,
+                xpReward,
+                subtasks: validSubtasks
+            };
+
+            if (deadline) payload.deadline = deadline;
+            if (linkedGoalId) payload.linkedGoalId = linkedGoalId;
 
             const res = await fetch("/api/habits", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title,
-                    category,
-                    difficulty,
-                    xpReward,
-                    subtasks: validSubtasks
-                })
+                body: JSON.stringify(payload)
             });
 
             if (!res.ok) {
@@ -66,6 +89,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             setCategory("");
             setDifficulty("medium");
             setSubtasks([""]);
+            setDeadline("");
+            setLinkedGoalId("");
+
             onQuestCreated();
             onClose();
         } catch (err) {
@@ -98,29 +124,58 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label>Category</label>
-                        <input
-                            type="text"
-                            required
-                            value={category}
-                            onChange={e => setCategory(e.target.value)}
-                            placeholder="e.g. Learning"
-                            className="game-input"
-                        />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
+                        <div className="form-group">
+                            <label>Category</label>
+                            <input
+                                type="text"
+                                required
+                                value={category}
+                                onChange={e => setCategory(e.target.value)}
+                                placeholder="e.g. Learning"
+                                className="game-input"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Difficulty</label>
+                            <select
+                                value={difficulty}
+                                onChange={e => setDifficulty(e.target.value as any)}
+                                className="game-input"
+                            >
+                                <option value="small">E-Rank (10 XP)</option>
+                                <option value="medium">C-Rank (25 XP)</option>
+                                <option value="hard">A-Rank (50 XP)</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Difficulty (determines XP)</label>
-                        <select
-                            value={difficulty}
-                            onChange={e => setDifficulty(e.target.value as any)}
-                            className="game-input"
-                        >
-                            <option value="small">E-Rank (Small - 10 XP)</option>
-                            <option value="medium">C-Rank (Medium - 25 XP)</option>
-                            <option value="hard">A-Rank (Hard - 50 XP)</option>
-                        </select>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
+                        <div className="form-group">
+                            <label>Deadline (Optional)</label>
+                            <input
+                                type="date"
+                                value={deadline}
+                                onChange={e => setDeadline(e.target.value)}
+                                min={new Date().toISOString().split("T")[0]}
+                                className="game-input"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Link to Goal (Optional)</label>
+                            <select
+                                value={linkedGoalId}
+                                onChange={e => setLinkedGoalId(e.target.value)}
+                                className="game-input"
+                            >
+                                <option value="">No Goal</option>
+                                {availableGoals.map(g => (
+                                    <option key={g._id} value={g._id}>{g.title}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="form-group">

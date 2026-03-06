@@ -22,8 +22,14 @@ export async function createHabit(userId: string, data: {
     xpReward: number;
     order?: number;
     subtasks?: string[];
+    deadline?: string;
+    linkedGoalId?: string;
 }) {
     await connectDB();
+
+    // Calculate total subtasks for deeper Phase 5 tracking
+    const totalSubtasksCount = data.subtasks ? data.subtasks.length : 0;
+
     const habit = await Habit.create({
         userId,
         title: data.title,
@@ -32,6 +38,9 @@ export async function createHabit(userId: string, data: {
         xpReward: data.xpReward,
         order: data.order || 0,
         isActive: true,
+        totalSubtasks: totalSubtasksCount,
+        deadline: data.deadline ? new Date(data.deadline) : undefined,
+        linkedGoalId: data.linkedGoalId || undefined
     });
 
     if (data.subtasks && data.subtasks.length > 0) {
