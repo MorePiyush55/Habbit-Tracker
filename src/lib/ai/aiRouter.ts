@@ -1,16 +1,16 @@
-import { hfClient, openRouterClient } from "./aiClient";
+import { openRouterClient } from "./aiClient";
 
 type TaskType = "chat" | "notification" | "analysis" | "strategy" | "learning" | "tutor";
 
-async function tryHF(model: string, prompt: string): Promise<string> {
-    const res = await hfClient.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-    });
-    return res.choices[0]?.message?.content || "";
-}
+// All free-tier models on OpenRouter — no credits required
+const MODELS = {
+    fast: "meta-llama/llama-3.1-8b-instruct:free",      // Chat, notifications
+    reason: "deepseek/deepseek-r1:free",                  // Analysis, strategy
+    tutor: "google/gemma-3-27b-it:free",                  // Learning, quizzes
+    fallback: "qwen/qwen-2.5-7b-instruct:free",           // Universal fallback
+};
 
-async function tryOpenRouter(model: string, prompt: string): Promise<string> {
+async function callModel(model: string, prompt: string): Promise<string> {
     const res = await openRouterClient.chat.completions.create({
         model,
         messages: [{ role: "user", content: prompt }],
@@ -19,36 +19,35 @@ async function tryOpenRouter(model: string, prompt: string): Promise<string> {
 }
 
 export async function aiRouter(taskType: TaskType, prompt: string): Promise<string> {
-    // Fast/Simple Tasks -> Qwen 3 (HuggingFace)
+    // Fast/Simple Tasks -> Llama 3.1 8B (free, fast)
     if (taskType === "chat" || taskType === "notification") {
         try {
-            return await tryHF("Qwen/Qwen3-8B:fastest", prompt);
+            return await callModel(MODELS.fast, prompt);
         } catch (e: any) {
-            console.warn("[AI Router] Qwen failed, falling back to DeepSeek:", e?.message);
-            return await tryHF("deepseek-ai/DeepSeek-R1:fastest", prompt);
+            console.warn("[AI Router] Llama failed, trying fallback:", e?.message);
+            return await callModel(MODELS.fallback, prompt);
         }
     }
 
-    // Complex Reasoning -> DeepSeek R1 (HuggingFace)
+    // Complex Reasoning -> DeepSeek R1 (free, powerful)
     if (taskType === "analysis" || taskType === "strategy") {
         try {
-            const content = await tryHF("deepseek-ai/DeepSeek-R1:fastest", prompt);
-            // Clean up any thinking blocks DeepSeek generates
+            const content = await callModel(MODELS.reason, prompt);
+            // Strip DeepSeek thinking blocks
             return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
         } catch (e: any) {
-            console.warn("[AI Router] DeepSeek failed, falling back to Qwen:", e?.message);
-            return await tryHF("Qwen/Qwen3-8B:fastest", prompt);
+            console.warn("[AI Router] DeepSeek failed, trying fallback:", e?.message);
+            return await callModel(MODELS.fast, prompt);
         }
     }
 
-    // Deep Tutoring / Knowledge -> Gemma 3 27B (OpenRouter), with Qwen fallback
+    // Tutoring / Learning -> Gemma 3 27B (free, knowledgeable)
     if (taskType === "learning" || taskType === "tutor") {
         try {
-            return await tryOpenRouter("google/gemma-3-27b-it:free", prompt);
+            return await callModel(MODELS.tutor, prompt);
         } catch (e: any) {
-            console.warn("[AI Router] Gemma 3 failed (likely rate-limited), falling back to Qwen:", e?.message);
-            // Fallback: Qwen on HuggingFace is fast and still capable for quizzes
-            return await tryHF("Qwen/Qwen3-8B:fastest", prompt);
+            console.warn("[AI Router] Gemma 3 rate-limited, trying fallback:", e?.message);
+            return await callModel(MODELS.fallback, prompt);
         }
     }
 
