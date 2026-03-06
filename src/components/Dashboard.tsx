@@ -186,6 +186,9 @@ export default function Dashboard() {
 
                 {/* Main Content */}
                 <div className="main-content">
+                    {/* System AI Controller moved to top of main content */}
+                    <SystemChat />
+
                     <BossBattle
                         bossHP={userStats.weeklyBossHP}
                         isDefeated={userStats.bossDefeatedThisWeek}
@@ -204,15 +207,10 @@ export default function Dashboard() {
                         onToggleSubtask={handleToggleSubtask}
                         loading={toggling}
                     />
-                    
+
                     <div style={{ marginTop: "var(--space-xl)" }}>
                         <DailyStrategyPanel />
                     </div>
-                </div>
-
-                {/* Right Sidebar: System AI Controller */}
-                <div className="sidebar-right">
-                    <SystemChat />
                 </div>
 
                 <CreateQuestModal

@@ -20,7 +20,7 @@ export default function AchievementBadges({ unlockedIds }: AchievementBadgesProp
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
                     gap: "var(--space-sm)",
-                    maxHeight: "300px",
+                    maxHeight: "160px",
                     overflowY: "auto",
                     paddingRight: "8px"
                 }}

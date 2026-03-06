@@ -446,9 +446,9 @@ body::before {
 /* ========== LAYOUT ========== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 320px 1fr 340px;
+  grid-template-columns: 320px 1fr;
   gap: var(--space-lg);
-  max-width: 1440px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-lg);
   min-height: 100vh;
@@ -1391,10 +1391,6 @@ body::before {
   .dashboard-grid {
     grid-template-columns: 280px 1fr;
   }
-
-  .sidebar-right {
-    display: none;
-  }
 }
 
 @media (max-width: 768px) {
@@ -1410,11 +1406,6 @@ body::before {
 
   .main-content {
     order: 2;
-  }
-
-  .sidebar-right {
-    display: flex;
-    order: 3;
   }
 
   .login-title {
