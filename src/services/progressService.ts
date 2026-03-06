@@ -45,6 +45,8 @@ export async function getTodayProgress(userId: string, date: string) {
                 difficulty: habit.difficulty,
                 xpReward: habit.xpReward,
                 order: habit.order,
+                isDaily: habit.isDaily ?? false,
+                deadline: habit.deadline ? habit.deadline.toISOString() : undefined,
                 subtasks: [],
                 completionPercent: isCompleted ? 100 : 0,
                 isFullyCompleted: isCompleted,
@@ -76,6 +78,8 @@ export async function getTodayProgress(userId: string, date: string) {
             difficulty: habit.difficulty,
             xpReward: habit.xpReward,
             order: habit.order,
+            isDaily: habit.isDaily ?? false,
+            deadline: habit.deadline ? habit.deadline.toISOString() : undefined,
             subtasks: subtasksWithProgress,
             completionPercent,
             isFullyCompleted,
@@ -109,6 +113,17 @@ export async function toggleSubtaskProgress(
     // Get habit info for XP
     const habit = await Habit.findById(habitId).lean();
     if (!habit) throw new Error("Habit not found");
+
+    // Lock: prevent unchecking completed daily tasks
+    if (!completed && habit.isDaily) {
+        const entryCheck: Record<string, unknown> = { userId, date, habitId };
+        if (subtaskId) entryCheck.subtaskId = subtaskId;
+        else entryCheck.subtaskId = null;
+        const existing = await ProgressEntry.findOne(entryCheck).lean();
+        if (existing?.completed) {
+            throw new Error("DAILY_LOCKED: Daily tasks cannot be unchecked once completed today");
+        }
+    }
 
     const subtaskCount = await Subtask.countDocuments({ habitId });
     const xpPerSubtask = subtaskCount > 0 ? Math.floor(habit.xpReward / subtaskCount) : habit.xpReward;

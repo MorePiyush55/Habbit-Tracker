@@ -50,6 +50,9 @@ export async function POST(req: Request) {
 
         return Response.json(result);
     } catch (error) {
+        if (error instanceof Error && error.message.startsWith("DAILY_LOCKED")) {
+            return Response.json({ error: "Daily task locked for today", locked: true }, { status: 403 });
+        }
         return handleError(error);
     }
 }

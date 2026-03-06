@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Scroll, Zap, Trash2, Pencil } from "lucide-react";
+import { ChevronDown, Scroll, Zap, Trash2, Pencil, Lock } from "lucide-react";
 
 interface Subtask {
     _id: string;
@@ -88,7 +88,7 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                             type="checkbox"
                                             className="quest-checkbox"
                                             checked={quest.isFullyCompleted}
-                                            disabled={loading}
+                                            disabled={loading || (quest.isDaily && quest.isFullyCompleted)}
                                             onChange={(e) => {
                                                 e.stopPropagation();
                                                 onToggleMainTask(quest._id, e.target.checked);
@@ -112,6 +112,11 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                                             {quest.completionPercent}%
                                         </span>
+                                        {quest.isDaily && quest.isFullyCompleted && (
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: "0.65rem", color: "var(--accent-green)", background: "rgba(0,255,136,0.08)", padding: "2px 6px", borderRadius: 4 }}>
+                                                <Lock size={10} /> Locked
+                                            </span>
+                                        )}
                                     </div>
                                     </div>
                                 </div>
@@ -206,7 +211,7 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                                 type="checkbox"
                                                 className="quest-checkbox"
                                                 checked={sub.completed}
-                                                disabled={loading}
+                                                disabled={loading || (quest.isDaily && sub.completed)}
                                                 onChange={(e) => {
                                                     onToggleSubtask(quest._id, sub._id, e.target.checked);
                                                 }}

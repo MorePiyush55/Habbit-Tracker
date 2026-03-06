@@ -34,6 +34,8 @@ interface Quest {
     subtasks: Subtask[];
     completionPercent: number;
     isFullyCompleted: boolean;
+    isDaily?: boolean;
+    deadline?: string;
 }
 
 export default function Dashboard() {
@@ -41,7 +43,8 @@ export default function Dashboard() {
     const [toggling, setToggling] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-    const today = new Date().toISOString().split("T")[0];
+    const todayDate = new Date();
+    const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
 
     const { data: progressData, isLoading: progressLoading, mutate: mutateProgress } = useSWR(
         `/api/progress?date=${today}`,

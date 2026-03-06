@@ -18,7 +18,8 @@ export default function TasksPage() {
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingToggles = useRef(0);
 
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
     const fetchQuests = useCallback(async () => {
         try {
@@ -51,6 +52,15 @@ export default function TasksPage() {
     }, [fetchQuests]);
 
     const handleToggleSubtask = async (habitId: string, subtaskId: string, completed: boolean) => {
+        // Block unchecking completed daily tasks
+        if (!completed) {
+            const quest = quests.find(q => q._id === habitId);
+            if (quest?.isDaily) {
+                const sub = quest.subtasks.find(s => s._id === subtaskId);
+                if (sub?.completed) return;
+            }
+        }
+
         // Optimistic update — instant, no disabling
         setQuests((prev) =>
             prev.map((q) => {
@@ -103,6 +113,12 @@ export default function TasksPage() {
     };
 
     const handleToggleMainTask = async (habitId: string, completed: boolean) => {
+        // Block unchecking completed daily tasks
+        if (!completed) {
+            const quest = quests.find(q => q._id === habitId);
+            if (quest?.isDaily && quest.isFullyCompleted) return;
+        }
+
         // Optimistic update — instant, no disabling
         setQuests((prev) =>
             prev.map((q) => {
