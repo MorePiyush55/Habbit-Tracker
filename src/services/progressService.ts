@@ -35,7 +35,7 @@ export async function getTodayProgress(userId: string, date: string) {
         // Handle habits with no subtasks — use main task entry
         if (habitSubtasks.length === 0) {
             const mainEntry = entries.find(
-                (e) => e.habitId?.toString() === habit._id.toString() && (!e.subtaskId || e.subtaskId.toString() === "")
+                (e) => e.habitId?.toString() === habit._id.toString() && !e.subtaskId
             );
             const isCompleted = mainEntry?.completed || false;
             return {
@@ -95,7 +95,7 @@ export async function toggleSubtaskProgress(
     userId: string,
     date: string,
     habitId: string,
-    subtaskId: string,
+    subtaskId: string | null,
     completed: boolean
 ) {
     await connectDB();
@@ -113,10 +113,16 @@ export async function toggleSubtaskProgress(
     const subtaskCount = await Subtask.countDocuments({ habitId });
     const xpPerSubtask = subtaskCount > 0 ? Math.floor(habit.xpReward / subtaskCount) : habit.xpReward;
 
+    // Build query — use null for main-task entries (no subtask)
+    const entryQuery: Record<string, unknown> = { userId, date, habitId };
+    if (subtaskId) {
+        entryQuery.subtaskId = subtaskId;
+    } else {
+        entryQuery.subtaskId = null;
+    }
+
     // Upsert entry
-    const existingEntry = await ProgressEntry.findOne({
-        userId, date, habitId, subtaskId,
-    });
+    const existingEntry = await ProgressEntry.findOne(entryQuery);
 
     let xpDelta = 0;
 
@@ -134,7 +140,7 @@ export async function toggleSubtaskProgress(
             userId,
             date,
             habitId,
-            subtaskId,
+            subtaskId: subtaskId || undefined,
             completed,
             xpEarned: completed ? xpPerSubtask : 0,
         });
@@ -171,14 +177,23 @@ export async function toggleSubtaskProgress(
     // Recalculate daily progress
     const allEntries = await ProgressEntry.find({ userId, date }).lean();
     const allHabits = await Habit.find({ userId, isActive: true }).lean();
-    const totalSubtasks = await Subtask.countDocuments({
+    const allSubtaskCount = await Subtask.countDocuments({
         habitId: { $in: allHabits.map((h) => h._id) },
     });
 
+    // Count habits that have NO subtasks — each counts as 1 completable item
+    const habitIdsWithSubtasks = await Subtask.distinct("habitId", {
+        habitId: { $in: allHabits.map((h) => h._id) },
+    });
+    const noSubtaskHabitCount = allHabits.filter(
+        (h) => !habitIdsWithSubtasks.some((sid) => String(sid) === String(h._id))
+    ).length;
+    const totalTasks = allSubtaskCount + noSubtaskHabitCount;
+
     const completedEntries = allEntries.filter((e) => e.completed);
     const totalXP = completedEntries.reduce((sum, e) => sum + e.xpEarned, 0);
-    const completionRate = totalSubtasks > 0
-        ? Math.round((completedEntries.length / totalSubtasks) * 100)
+    const completionRate = totalTasks > 0
+        ? Math.round((completedEntries.length / totalTasks) * 100)
         : 0;
     const bossDefeated = completionRate === 100;
 
@@ -207,7 +222,7 @@ export async function toggleSubtaskProgress(
         const currentLevel = user?.level || 1;
 
         // 1. Core event: Subtask toggled
-        await emit(SystemEvents.subtaskToggled(userId, habitId, subtaskId, completed, xpDelta));
+        await emit(SystemEvents.subtaskToggled(userId, habitId, subtaskId || "", completed, xpDelta));
 
         // 2. Check for level up
         if (currentLevel > previousLevel) {
@@ -270,7 +285,7 @@ export async function toggleSubtaskProgress(
                 $set: {
                     tasksCompleted: questsCompleted2,
                     tasksFailed: allEntries.filter(e => !e.completed).length,
-                    totalTasks: totalSubtasks,
+                    totalTasks: totalTasks,
                     completionRate,
                     streakStatus: user?.currentStreak || 0,
                     xpEarned: totalXP,

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
             userId,
             parsed.data.date,
             parsed.data.habitId,
-            parsed.data.subtaskId || "",
+            parsed.data.subtaskId || null,
             parsed.data.completed
         );
 
