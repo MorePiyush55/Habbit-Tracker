@@ -118,11 +118,28 @@ export async function toggleSubtaskProgress(
         if (completed) xpDelta = xpPerSubtask;
     }
 
-    // Update user XP
+    // Update user XP and Boss Raid HP
+    let raidCleared = false;
     if (xpDelta !== 0) {
         const user = await User.findById(userId);
         if (user) {
             user.totalXP = Math.max(0, user.totalXP + xpDelta);
+
+            // Phase 5: Weekly Boss Raid Damage Logic
+            if (xpDelta > 0 && !user.bossDefeatedThisWeek) {
+                user.weeklyBossHP = Math.max(0, (user.weeklyBossHP || 500) - xpDelta);
+
+                // Check if Boss is defeated (HP drained AND 5 day streak maintained)
+                if (user.weeklyBossHP === 0 && user.currentStreak >= 5) {
+                    user.bossDefeatedThisWeek = true;
+                    raidCleared = true;
+                    user.totalXP += 300; // Boss Reward
+                }
+            } else if (xpDelta < 0 && !user.bossDefeatedThisWeek) {
+                // If they uncheck a task, boss regains HP
+                user.weeklyBossHP = Math.min(500, (user.weeklyBossHP || 500) - xpDelta);
+            }
+
             user.level = getLevelFromXP(user.totalXP);
             await user.save();
         }

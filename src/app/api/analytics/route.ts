@@ -23,6 +23,12 @@ export async function GET(req: Request) {
                 totalXP: user?.totalXP,
                 currentStreak: user?.currentStreak,
                 longestStreak: user?.longestStreak,
+                disciplineScore: user?.disciplineScore || 50,
+                focusScore: user?.focusScore || 50,
+                skillGrowthScore: user?.skillGrowthScore || 50,
+                hunterRank: user?.hunterRank || "E-Class",
+                weeklyBossHP: user?.weeklyBossHP || 500,
+                bossDefeatedThisWeek: user?.bossDefeatedThisWeek || false
             },
             history,
         });

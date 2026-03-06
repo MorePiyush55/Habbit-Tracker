@@ -1,37 +1,37 @@
 "use client";
 
-import { calculateBossState } from "@/lib/game-engine/bossBattleSystem";
-import { Skull, Shield } from "lucide-react";
+import { Skull, Shield, Flame } from "lucide-react";
 
 interface BossBattleProps {
-    date: string;
-    entries: { xpEarned: number; completed: boolean }[];
+    bossHP: number;
+    isDefeated: boolean;
+    currentStreak: number;
 }
 
-export default function BossBattle({ date, entries }: BossBattleProps) {
-    const boss = calculateBossState(date, entries);
-    const hpPercent = (boss.currentHP / boss.totalHP) * 100;
+export default function BossBattle({ bossHP, isDefeated, currentStreak }: BossBattleProps) {
+    const totalHP = 500;
+    const hpPercent = (bossHP / totalHP) * 100;
 
     return (
-        <div className={`glass-card boss-card ${boss.isDefeated ? "defeated" : ""}`}>
+        <div className={`glass-card boss-card ${isDefeated ? "defeated" : ""}`}>
             <div className="section-title">
-                {boss.isDefeated ? (
+                {isDefeated ? (
                     <Shield size={20} style={{ color: "var(--accent-green)" }} />
                 ) : (
                     <Skull size={20} style={{ color: "var(--accent-red)" }} />
                 )}
-                {boss.isDefeated ? "Boss Defeated!" : "Today's Boss"}
+                {isDefeated ? "Raid Cleared!" : "Weekly Boss Raid"}
             </div>
 
             <div className="boss-name">
-                {boss.isDefeated ? `☠️ ${boss.bossName}` : `💀 ${boss.bossName}`}
+                {isDefeated ? `☠️ Discipline Titan (Defeated)` : `💀 Discipline Titan`}
             </div>
 
-            {!boss.isDefeated ? (
+            {!isDefeated ? (
                 <>
                     <div className="boss-hp-label">
                         <span>HP</span>
-                        <span>{boss.currentHP} / {boss.totalHP}</span>
+                        <span>{bossHP} / {totalHP}</span>
                     </div>
                     <div className="progress-bar" style={{ height: 16 }}>
                         <div
@@ -39,6 +39,17 @@ export default function BossBattle({ date, entries }: BossBattleProps) {
                             style={{ width: `${hpPercent}%` }}
                         />
                     </div>
+
+                    <div style={{ display: "flex", gap: "var(--space-md)", marginTop: "var(--space-md)", justifyContent: "center" }}>
+                        <span className="badge" style={{ background: currentStreak >= 5 ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)", color: currentStreak >= 5 ? "var(--accent-green)" : "var(--accent-red)" }}>
+                            <Flame size={12} style={{ display: "inline", marginRight: 4 }} />
+                            Requirement: 5 Day Streak ({currentStreak}/5)
+                        </span>
+                        <span className="badge" style={{ background: "rgba(245, 158, 11, 0.2)", color: "var(--accent-gold)" }}>
+                            Reward: +300 XP
+                        </span>
+                    </div>
+
                     <p
                         style={{
                             fontSize: "0.8rem",
@@ -47,11 +58,11 @@ export default function BossBattle({ date, entries }: BossBattleProps) {
                             textAlign: "center",
                         }}
                     >
-                        Complete all quests to defeat the boss!
+                        Deal 500 damage (XP) and maintain a 5-day streak to slay the titan!
                     </p>
                 </>
             ) : (
-                <div className="boss-defeated-text">⚔️ VICTORY! ⚔️</div>
+                <div className="boss-defeated-text">⚔️ RAID CLEAR! +300 XP GRANTED ⚔️</div>
             )}
         </div>
     );

@@ -10,6 +10,8 @@ interface PlayerStatsProps {
     totalXP: number;
     currentStreak: number;
     longestStreak: number;
+    disciplineScore: number;
+    hunterRank: string;
 }
 
 export default function PlayerStats({
@@ -18,6 +20,8 @@ export default function PlayerStats({
     totalXP,
     currentStreak,
     longestStreak,
+    disciplineScore,
+    hunterRank,
 }: PlayerStatsProps) {
     const levelInfo = getLevelInfo(totalXP);
     const streakInfo = getStreakInfo(currentStreak, longestStreak);
@@ -41,7 +45,7 @@ export default function PlayerStats({
                 </div>
             )}
             <div className="player-name">{name}</div>
-            <span className="badge badge-rank">{levelInfo.title}</span>
+            <span className="badge badge-rank">{hunterRank}</span>
             <div className="player-level">Lv. {levelInfo.level}</div>
 
             <div className="xp-label">
@@ -55,6 +59,18 @@ export default function PlayerStats({
                     className="progress-fill progress-fill-xp"
                     style={{ width: `${levelInfo.progress}%` }}
                 />
+            </div>
+
+            <div className="stat-grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: "var(--space-md)" }}>
+                <div className="stat-item" style={{ gridColumn: "span 2", background: "rgba(79, 124, 255, 0.1)", border: "1px solid rgba(79, 124, 255, 0.3)" }}>
+                    <div className="stat-value" style={{ color: "var(--accent-blue)", fontSize: "2rem" }}>
+                        {disciplineScore}
+                    </div>
+                    <div className="stat-label">
+                        <Award size={14} style={{ display: "inline", marginRight: 4 }} />
+                        Discipline Score
+                    </div>
+                </div>
             </div>
 
             <div className="stat-grid">

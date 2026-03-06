@@ -41,6 +41,12 @@ export default function Dashboard() {
         currentStreak: 0,
         longestStreak: 0,
         level: 1,
+        disciplineScore: 50,
+        focusScore: 50,
+        skillGrowthScore: 50,
+        hunterRank: "E-Class",
+        weeklyBossHP: 500,
+        bossDefeatedThisWeek: false,
     });
     const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState(false);
@@ -66,6 +72,12 @@ export default function Dashboard() {
                         currentStreak: statsData.user.currentStreak || 0,
                         longestStreak: statsData.user.longestStreak || 0,
                         level: statsData.user.level || 1,
+                        disciplineScore: statsData.user.disciplineScore || 50,
+                        focusScore: statsData.user.focusScore || 50,
+                        skillGrowthScore: statsData.user.skillGrowthScore || 50,
+                        hunterRank: statsData.user.hunterRank || "E-Class",
+                        weeklyBossHP: statsData.user.weeklyBossHP || 500,
+                        bossDefeatedThisWeek: statsData.user.bossDefeatedThisWeek || false,
                     });
                 }
             }
@@ -151,6 +163,8 @@ export default function Dashboard() {
                     totalXP={userStats.totalXP}
                     currentStreak={userStats.currentStreak}
                     longestStreak={userStats.longestStreak}
+                    disciplineScore={userStats.disciplineScore}
+                    hunterRank={userStats.hunterRank}
                 />
                 <StreakDisplay
                     currentStreak={userStats.currentStreak}
@@ -170,7 +184,11 @@ export default function Dashboard() {
 
             {/* Main Content */}
             <div className="main-content">
-                <BossBattle date={today} entries={bossEntries} />
+                <BossBattle
+                    bossHP={userStats.weeklyBossHP}
+                    isDefeated={userStats.bossDefeatedThisWeek}
+                    currentStreak={userStats.currentStreak}
+                />
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "-10px" }}>
                     <h2 className="section-title" style={{ margin: 0 }}>
