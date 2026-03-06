@@ -2,52 +2,71 @@ import { openRouterClient } from "./aiClient";
 
 type TaskType = "chat" | "notification" | "analysis" | "strategy" | "learning" | "tutor";
 
-// All verified free-tier models on OpenRouter
+// Verified free models on OpenRouter — sorted by demand (low → high contest)
+// Avoid ultra-popular models (Llama 3.2 3B = 8 rpm limit, too restrictive)
 const MODELS = {
-    fast: "meta-llama/llama-3.2-3b-instruct:free",       // Chat, notifications (verified free)
-    reason: "deepseek/deepseek-r1:free",                  // Analysis, strategy (verified free)
-    tutor: "google/gemma-3-27b-it:free",                  // Learning, quizzes (verified free)
-    tutor2: "google/gemma-3-12b-it:free",                 // Tutor fallback (verified free)
-    fallback: "meta-llama/llama-3.2-3b-instruct:free",   // Universal fallback (same as fast)
+    // Chat: Gemma 3 4B — small, fast, low demand vs Llama
+    fast: "google/gemma-3-4b-it:free",
+    fast2: "google/gemma-3n-e2b-it:free",         // ultra-light fallback
+    // Reasoning: DeepSeek R1 — best free reasoning model
+    reason: "deepseek/deepseek-r1:free",
+    reason2: "google/gemma-3-12b-it:free",          // reasoning fallback
+    // Tutor: Gemma 3 27B → 12B → 4B cascade
+    tutor: "google/gemma-3-27b-it:free",
+    tutor2: "google/gemma-3-12b-it:free",
 };
 
-async function callModel(model: string, prompt: string): Promise<string> {
-    const res = await openRouterClient.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-    });
-    return res.choices[0]?.message?.content || "";
+// Retry up to 2 times with 1-second delay between attempts
+async function callModel(model: string, prompt: string, retries = 2): Promise<string> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const res = await openRouterClient.chat.completions.create({
+                model,
+                messages: [{ role: "user", content: prompt }],
+            });
+            return res.choices[0]?.message?.content || "";
+        } catch (e: any) {
+            const is429 = e?.status === 429 || e?.message?.includes("429");
+            // Only retry on rate limits, and only if attempts remain
+            if (is429 && attempt < retries) {
+                console.warn(`[AI Router] Rate limited on ${model}, retrying in 2s... (attempt ${attempt + 1})`);
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+            }
+            throw e; // propagate other errors or final attempt
+        }
+    }
+    return "";
 }
 
 export async function aiRouter(taskType: TaskType, prompt: string): Promise<string> {
-    // Fast/Simple Tasks -> Llama 3.1 8B (free, fast)
+    // Fast/Simple Tasks → Gemma 3 4B (lighter, less contested than Llama)
     if (taskType === "chat" || taskType === "notification") {
         try {
             return await callModel(MODELS.fast, prompt);
         } catch (e: any) {
-            console.warn("[AI Router] Llama failed, trying fallback:", e?.message);
-            return await callModel(MODELS.fallback, prompt);
+            console.warn("[AI Router] Gemma 4B failed, trying ultra-light fallback:", e?.message);
+            return await callModel(MODELS.fast2, prompt);
         }
     }
 
-    // Complex Reasoning -> DeepSeek R1 (free, powerful)
+    // Complex Reasoning → DeepSeek R1 free
     if (taskType === "analysis" || taskType === "strategy") {
         try {
             const content = await callModel(MODELS.reason, prompt);
-            // Strip DeepSeek thinking blocks
             return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
         } catch (e: any) {
-            console.warn("[AI Router] DeepSeek failed, trying fallback:", e?.message);
-            return await callModel(MODELS.fast, prompt);
+            console.warn("[AI Router] DeepSeek failed, falling back to Gemma 12B:", e?.message);
+            return await callModel(MODELS.reason2, prompt);
         }
     }
 
-    // Tutoring / Learning -> Gemma 3 27B (free, knowledgeable)
+    // Tutoring / Learning → Gemma 3 27B → 12B cascade
     if (taskType === "learning" || taskType === "tutor") {
         try {
             return await callModel(MODELS.tutor, prompt);
         } catch (e: any) {
-            console.warn("[AI Router] Gemma 3 27B rate-limited, trying Gemma 3 12B:", e?.message);
+            console.warn("[AI Router] Gemma 27B rate-limited, trying Gemma 12B:", e?.message);
             return await callModel(MODELS.tutor2, prompt);
         }
     }
