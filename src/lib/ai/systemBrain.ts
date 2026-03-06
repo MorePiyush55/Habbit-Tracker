@@ -96,7 +96,7 @@ function analyzeBehaviorPatterns(logs: any[]) {
 // ============================================================
 export async function systemDecision(
     userId: string,
-    actionType: "GENERATE_QUESTS" | "DAILY_STRATEGY" | "ANALYZE_BEHAVIOR" | "DIFFICULTY_CHECK" | "BOSS_ADJUSTMENT",
+    actionType: "GENERATE_QUESTS" | "DAILY_STRATEGY" | "ANALYZE_BEHAVIOR" | "DIFFICULTY_CHECK" | "BOSS_ADJUSTMENT" | "SYSTEM_CHAT",
     context: Record<string, any>
 ): Promise<any> {
     await connectDB();
@@ -228,6 +228,9 @@ export async function systemDecision(
         case "BOSS_ADJUSTMENT":
             // Rule-only: no Gemini call needed
             result = await adjustBossDifficulty(userId, universalContext);
+            break;
+        case "SYSTEM_CHAT":
+            result = await handleSystemChat(universalContext);
             break;
         default:
             throw new Error(`Unknown action: ${actionType}`);
@@ -483,4 +486,50 @@ async function adjustBossDifficulty(userId: string, ctx: any) {
         bossHP: scaledHP,
         basedOnDiscipline: disciplineScore
     };
+}
+
+// ============================================================
+// ACTION: Chat with System
+// ============================================================
+async function handleSystemChat(context: any) {
+    const { message, history, ...hunterMemory } = context;
+
+    const prompt = `You are "The System" from Solo Leveling. You are an AI Discipline Engine.
+You must speak with an imposing, authoritative, cold, yet occasionally mentoring tone.
+You exist to push the "Hunter" (the user) beyond their limits.
+Address the user as "Hunter" at all times.
+
+IMPORTANT RULES:
+- Return ONLY plain text. No JSON. No markdown code blocks. No formatting.
+- Be direct and commanding.
+- Keep responses concise (2-5 sentences max).
+- If the hunter has failed tasks, interrogate them harshly.
+- If they are doing well, acknowledge briefly, then push harder.
+
+Hunter's Full Psychological & Performance Memory:
+${JSON.stringify(hunterMemory, null, 2)}
+
+Previous Conversation History:
+${JSON.stringify(history?.slice(-5) || [], null, 2)}
+
+Hunter's New Message:
+"${message}"
+
+Respond as The System. Plain text only. No JSON. No markdown.`;
+
+    const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("AI_TIMEOUT")), 15000)
+    );
+
+    try {
+        const response = await Promise.race([
+            model.generateContent(prompt),
+            timeout
+        ]);
+        const text = (response as any).response.text();
+        return { reply: text.replace(/```[\s\S]*?```/g, "").trim() };
+    } catch (e: any) {
+        console.error("[System Brain SYSTEM_CHAT Error]:", e.message);
+        return { reply: "⚠ SYSTEM NOTICE\n\nSystem malfunction detected.\nRetry your request." };
+    }
 }

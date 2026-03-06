@@ -1,5 +1,5 @@
 import { getUserId } from "@/lib/auth";
-import { generateSystemResponse } from "@/lib/ai/analysisService";
+import { systemDecision } from "@/lib/ai/systemBrain";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
@@ -62,9 +62,9 @@ export async function POST(req: Request) {
         }));
 
         // Call Gemini (with timeout + fallback built in)
-        console.log("[System Chat] Calling Gemini for user:", userId);
-        const aiResponse = await generateSystemResponse(userId, hunterData, history, message);
-        console.log("[System Chat] Gemini responded successfully");
+        console.log("[System Chat] Calling System Brain for user:", userId);
+        const aiResponse = await systemDecision(userId, "SYSTEM_CHAT", { message, history });
+        console.log("[System Chat] System Brain responded successfully");
 
         // Save System response
         await SystemMessage.create({
