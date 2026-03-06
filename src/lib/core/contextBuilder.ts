@@ -13,6 +13,8 @@
 
 import type { SystemState } from "@/types";
 import type { MemorySnapshot } from "./systemMemory";
+import connectDB from "@/lib/mongodb";
+import HunterProfile from "@/models/HunterProfile";
 
 // ============================================================
 // Types
@@ -23,6 +25,7 @@ export interface AIContext {
     full: string;        // Full context (~1500 tokens) for complex reasoning
     structured: {        // Programmatic access to context pieces
         hunterProfile: string;
+        hunterMissions: string;
         currentHabits: string;
         behaviorSummary: string;
         skillOverview: string;
@@ -36,11 +39,11 @@ export interface AIContext {
 // BUILD: Create AI context from state + memory
 // ============================================================
 
-export function buildAIContext(
+export async function buildAIContext(
     state: SystemState,
     memory?: MemorySnapshot | null
-): AIContext {
-    const hunterProfile = buildHunterProfile(state);
+): Promise<AIContext> {
+    const hunterProfile = buildHunterProfileSection(state);
     const currentHabits = buildHabitsContext(state);
     const behaviorSummary = buildBehaviorSummary(state);
     const skillOverview = buildSkillOverview(state);
@@ -48,18 +51,30 @@ export function buildAIContext(
     const memoryInsights = memory ? buildMemoryInsights(memory) : "No persistent memory available.";
     const activeInterventions = memory ? buildInterventionContext(memory) : "No intervention history.";
 
+    // Fetch hunter profile for deep context
+    let hunterMissions = "";
+    try {
+        await connectDB();
+        const profile = await HunterProfile.findOne({ userId: state.hunter.userId }).lean() as Record<string, any> | null;
+        if (profile?.isOnboarded) {
+            hunterMissions = buildHunterMissionsContext(profile);
+        }
+    } catch { /* non-fatal */ }
+
     // Compact context — for simple AI calls (chat, notifications)
     const compact = `HUNTER: ${state.hunter.name} | Lv.${state.hunter.level} | ${state.hunter.hunterRank}
 Streak: ${state.hunter.streak} days | Discipline: ${state.hunter.disciplineScore}% | XP: ${state.hunter.xp}
 Today: ${state.activeHabits.length} habits | ${state.weakHabits.length} weak | ${state.strongHabits.length} strong
 Trend: ${state.behaviorAnalysis.trend} | Avg Completion: ${state.behaviorAnalysis.avgCompletion}%
 ${state.weakHabits.length > 0 ? `Weak: ${state.weakHabits.join(", ")}` : "No weak habits."}
-${memory?.weeklyInsights.generatedAt ? `Memory: ${memory.weeklyInsights.disciplineTrend} trend | Consistency: ${memory.weeklyInsights.consistencyScore}/100` : ""}`;
+${hunterMissions ? `Missions: ${hunterMissions.substring(0, 200)}` : ""}
+${memory?.weeklyInsights.generatedAt ? `Memory: ${memory.weeklyInsights.disciplineTrend} trend | Consistency: ${memory.weeklyInsights.consistencyScore}/100` : ""}`.trim();
 
     // Full context — for strategy, analysis, complex decisions
     const full = `=== SYSTEM STATE ===
 
 ${hunterProfile}
+${hunterMissions ? `\n${hunterMissions}` : ""}
 
 ${currentHabits}
 
@@ -78,6 +93,7 @@ ${activeInterventions}`;
         full,
         structured: {
             hunterProfile,
+            hunterMissions,
             currentHabits,
             behaviorSummary,
             skillOverview,
@@ -92,7 +108,7 @@ ${activeInterventions}`;
 // SECTION BUILDERS
 // ============================================================
 
-function buildHunterProfile(state: SystemState): string {
+function buildHunterProfileSection(state: SystemState): string {
     const h = state.hunter;
     return `[HUNTER PROFILE]
 Name: ${h.name}
@@ -100,6 +116,50 @@ Level: ${h.level} | Rank: ${h.hunterRank}
 XP: ${h.xp} | Streak: ${h.streak} days (longest: ${h.longestStreak})
 Discipline: ${h.disciplineScore}% | Focus: ${h.focusScore}% | Skill Growth: ${h.skillGrowthScore}%
 Boss: ${state.bossRaid.bossDefeatedThisWeek ? "DEFEATED this week" : `HP: ${state.bossRaid.bossHP}`}`;
+}
+
+function buildHunterMissionsContext(profile: Record<string, any>): string {
+    const parts: string[] = ["[HUNTER MISSIONS & GOALS]"];
+
+    if (profile.missions?.length > 0) {
+        parts.push(`Top Missions: ${profile.missions.join(" | ")}`);
+    }
+
+    if (profile.learningProgress?.length > 0) {
+        const lpLines = profile.learningProgress.map((lp: any) => {
+            const pct = Math.round((lp.completedUnits / lp.totalUnits) * 100);
+            return `  ${lp.name}: ${lp.completedUnits}/${lp.totalUnits} (${pct}%)`;
+        });
+        parts.push(`Learning Progress:\n${lpLines.join("\n")}`);
+    }
+
+    if (profile.weeklyTargets?.length > 0) {
+        const wtLines = profile.weeklyTargets.map((wt: any) =>
+            `  ${wt.name}: ${wt.current}/${wt.target} this week`
+        );
+        parts.push(`Weekly Targets:\n${wtLines.join("\n")}`);
+    }
+
+    if (profile.skillRatings?.length > 0) {
+        const srLines = profile.skillRatings.map((sr: any) =>
+            `  ${sr.name}: ${sr.rating}/100`
+        );
+        parts.push(`Self-Rated Skills:\n${srLines.join("\n")}`);
+    }
+
+    parts.push(`Available Time: ${profile.dailyAvailableHours || 4}h/day | Best Focus: ${profile.bestFocusTime || "morning"}`);
+
+    if (profile.frequentlySkippedTasks?.length > 0) {
+        parts.push(`Frequently Skipped: ${profile.frequentlySkippedTasks.join(", ")}`);
+    }
+
+    if (profile.sixMonthVision?.length > 0) {
+        parts.push(`6-Month Vision: ${profile.sixMonthVision.join(" | ")}`);
+    }
+
+    parts.push(`Self-Eval: Discipline ${profile.selfDisciplineRating || 50}/100 | Focus ${profile.selfFocusRating || 50}/100`);
+
+    return parts.join("\n");
 }
 
 function buildHabitsContext(state: SystemState): string {

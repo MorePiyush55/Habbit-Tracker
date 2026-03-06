@@ -3,7 +3,7 @@
  * ======================================
  * This is the central nervous system of the application.
  *
- * Architecture (v4 — Brain v3 Autonomous + Multi-Agent Console):
+ * Architecture (v5 — Intelligent Coaching + Action Planner):
  *
  *   User / Console / Scheduler
  *        ↓
@@ -15,19 +15,22 @@
  *     • Evolution Engine (self-evolving rules)
  *     • Shadow Coach (reviews ALL outputs)
  *     • Cognitive Optimizer (workload caps)
+ *     • Action Planner (tactical directives)
  *        ↓
  *   AI Modules:
  *     • behaviorAnalyzer   • lifeSimulator
  *     • trainingEngine     • strategyGenerator
  *     • brainController    • personalityLayer
+ *     • actionPlanner      • contextBuilder (profile-aware)
  *        ↓
  *   Directive Generator → Directive Formatter
  *        ↓
  *   Multi-Agent Response → UI / Notifications
  *
  *   Scheduler (autonomous) → Brain v3 autonomous events
+ *   Hunter Profile → Context Builder → AI prompts
  *
- * Total modules: 24
+ * Total modules: 25
  */
 
 // Central State
@@ -124,3 +127,7 @@ export type { FutureProjection } from "./lifeSimulator";
 // Cognitive Optimizer — Workload intelligence
 export { assessCognitiveLoad } from "./cognitiveOptimizer";
 export type { CognitiveAssessment, TaskRecommendation } from "./cognitiveOptimizer";
+
+// Action Planner — Tactical directive generator (v4)
+export { generateActionPlan, formatActionPlan } from "./actionPlanner";
+export type { ActionPlan, ActionItem, HunterProfileData } from "./actionPlanner";

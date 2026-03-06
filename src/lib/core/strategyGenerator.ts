@@ -72,7 +72,7 @@ async function generateAIStrategy(state: SystemState): Promise<DailyStrategy> {
         memoryForContext = await recallMemory(state.hunter.userId);
     } catch { /* proceed without memory */ }
 
-    const context = buildAIContext(state, memoryForContext);
+    const context = await buildAIContext(state, memoryForContext);
 
     const prompt = `You are THE SYSTEM from Solo Leveling. Generate a daily training strategy for this Hunter.
 

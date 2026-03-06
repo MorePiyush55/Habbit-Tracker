@@ -281,7 +281,7 @@ const COMMAND_HANDLERS: Record<CommandType, (
     // ── DEBRIEF ──────────────────────────────────────────
     REQUEST_DEBRIEF: async (cmd, state, memory, userId) => {
         const insight = await analyzeBehavior(userId, 7);
-        const context = buildAIContext(state, memory);
+        const context = await buildAIContext(state, memory);
 
         // Use AI for the debrief narrative
         let narrative = "";
@@ -383,7 +383,7 @@ RULES:
 
         // Try AI for motivation, fall back to rule-based
         try {
-            const context = buildAIContext(state, memory);
+            const context = await buildAIContext(state, memory);
             const { aiRouter } = await import("@/lib/ai/aiRouter");
             motivationText = await aiRouter("chat", `You are THE SYSTEM from Solo Leveling. The Hunter needs a push.
 
@@ -448,7 +448,7 @@ async function handleFreeChat(
     memory: MemorySnapshot | null,
     userId: string
 ): Promise<HandlerResult> {
-    const context = buildAIContext(state, memory);
+    const context = await buildAIContext(state, memory);
 
     let reply: string;
     let usedAI = false;

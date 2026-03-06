@@ -42,6 +42,7 @@ import { evolveStrategy, getStoredParams } from "./evolutionEngine";
 import { reviewStrategy, reviewConsoleResponse } from "./shadowCoach";
 import { getAvailableCommands } from "./commandInterpreter";
 import { generateQuestion, detectWeakestSkill, getTrainingRecommendations } from "./trainingEngine";
+import { generateActionPlan, formatActionPlan } from "./actionPlanner";
 
 // ============================================================
 // Types
@@ -247,7 +248,23 @@ const COMMAND_HANDLERS: Record<CommandType, (
         });
 
         const formatted = formatDirective(directive, state);
-        const agentMessages: AgentMessage[] = [msg("SYSTEM", formatted)];
+
+        // v4: Action plan enrichment
+        let actionPlanText = "";
+        try {
+            const plan = await generateActionPlan(userId, state);
+            if (plan.immediateActions.length > 0) {
+                actionPlanText = `\n\nDIRECTIVE\n\nPriority order:\n` +
+                    plan.immediateActions.map((a, i) => `${i + 1}. ${a.task} — ${a.reason}`).join("\n");
+                if (plan.estimatedTotalMinutes > 0) {
+                    const hours = Math.floor(plan.estimatedTotalMinutes / 60);
+                    const mins = plan.estimatedTotalMinutes % 60;
+                    actionPlanText += `\n\nEstimated time: ${hours > 0 ? `${hours}h ${mins}m` : `${mins}m`}.`;
+                }
+            }
+        } catch { /* non-fatal */ }
+
+        const agentMessages: AgentMessage[] = [msg("SYSTEM", formatted + actionPlanText)];
         const agents: AgentRole[] = ["SYSTEM"];
 
         // v3: If overloaded, shadow coach adds recommendation
@@ -395,11 +412,21 @@ const COMMAND_HANDLERS: Record<CommandType, (
         });
 
         const formatted = formatDirective(directive, state);
-        const agentMessages: AgentMessage[] = [msg("SYSTEM", formatted)];
+
+        // v4: Generate action plan for tactical guidance
+        let actionPlanText = "";
+        try {
+            const plan = await generateActionPlan(userId, state);
+            actionPlanText = formatActionPlan(plan, state);
+        } catch { /* non-fatal */ }
+
+        // v4: God-level response = STATUS + ANALYSIS + DIRECTIVE
+        const fullResponse = formatted + (actionPlanText ? `\n\n${actionPlanText}` : "");
+
+        const agentMessages: AgentMessage[] = [msg("SYSTEM", fullResponse)];
         const agents: AgentRole[] = ["SYSTEM"];
 
         // v3: Multi-agent enrichment on status
-        // Analyst adds trend insight
         const trend = state.behaviorAnalysis.trend;
         if (trend !== "stable") {
             agentMessages.push(msg("ANALYST",
@@ -412,7 +439,7 @@ const COMMAND_HANDLERS: Record<CommandType, (
         const params = getStoredParams(memory);
         if (params.streakProtectionMode && h.streak >= 7) {
             agentMessages.push(msg("SYSTEM",
-                `🛡️ Streak Protection: ACTIVE (${h.streak}-day streak). System is guarding your chain.`));
+                `Streak Protection: ACTIVE (${h.streak}-day streak). System is guarding your chain.`));
         }
 
         return {
@@ -511,7 +538,7 @@ const COMMAND_HANDLERS: Record<CommandType, (
     // ── DEBRIEF ──────────────────────────────────────────
     REQUEST_DEBRIEF: async (cmd, state, memory, userId) => {
         const insight = await analyzeBehavior(userId, 7);
-        const context = buildAIContext(state, memory);
+        const context = await buildAIContext(state, memory);
 
         // AI narrative
         let narrative = "";
@@ -668,23 +695,38 @@ RULES:
         let motivationText: string;
         let usedAI = false;
 
+        // v4: Get action plan for specific directive
+        let nextAction = "";
         try {
-            const context = buildAIContext(state, memory);
+            const plan = await generateActionPlan(userId, state);
+            if (plan.immediateActions.length > 0) {
+                nextAction = `\n\nImmediate order: ${plan.immediateActions[0].task}. ` +
+                    `Estimated time: ${plan.immediateActions[0].estimatedMinutes} minutes. Begin now.`;
+            }
+        } catch { /* non-fatal */ }
+
+        try {
+            const context = await buildAIContext(state, memory);
             const { aiRouter } = await import("@/lib/ai/aiRouter");
             motivationText = await aiRouter("chat", `You are THE SYSTEM from Solo Leveling. The Hunter needs a push.
 
 ${context.compact}
 
-Give a 2-3 sentence motivational push. Be commanding, not friendly. Reference their actual data (streak, level, weak areas). End with a direct order. Plain text only.`);
+Give a 2-4 sentence motivational push. Be commanding, not friendly. Reference their actual data (streak, level, weak areas). End with a SPECIFIC directive: tell them exactly which task to do next. Plain text only.`);
+            motivationText += nextAction;
             usedAI = true;
         } catch {
+            const remaining = state.activeHabits.filter(hab => hab.progress < 100);
             if (h.streak >= 7) {
-                motivationText = `Hunter. ${h.streak}-day streak active. You didn't come this far to stop. Execute today's tasks or watch that chain shatter. Move.`;
+                motivationText = `Hunter. ${h.streak}-day streak active. You didn't come this far to stop. Execute today's tasks or watch that chain shatter.`;
             } else if (h.disciplineScore < 40) {
-                motivationText = `Hunter. Discipline at ${h.disciplineScore}%. This is unacceptable. You know what you need to do. Stop thinking. Start executing. Now.`;
+                motivationText = `Hunter. Discipline at ${h.disciplineScore}%. This is unacceptable. Stop thinking. Start executing.`;
             } else {
-                motivationText = `Hunter. Level ${h.level}. ${h.xp} XP earned through effort. Don't waste it with inaction today. The System is watching. Perform.`;
+                motivationText = `Hunter. Level ${h.level}. ${h.xp} XP earned through effort. Don't waste it with inaction today.`;
             }
+            motivationText += nextAction || (remaining.length > 0
+                ? `\n\nImmediate order: ${remaining[0].name}. Begin now.`
+                : `\n\nAll tasks complete. Stand by for next cycle.`);
         }
 
         // v3: Shadow coach reviews motivation
@@ -831,7 +873,19 @@ async function handleFreeChat(
     memory: MemorySnapshot | null,
     userId: string
 ): Promise<HandlerResult> {
-    const context = buildAIContext(state, memory);
+    const context = await buildAIContext(state, memory);
+
+    // v4: Generate action plan for tactical context
+    let actionContext = "";
+    try {
+        const plan = await generateActionPlan(userId, state);
+        if (plan.immediateActions.length > 0) {
+            actionContext = `\n\nACTION PLAN (use this to give specific directives):\nFocus Area: ${plan.focusArea}\nImmediate: ${plan.immediateActions.map(a => a.task).join(", ")}\nEstimated Time: ${plan.estimatedTotalMinutes} minutes\nDifficulty: ${plan.difficulty}`;
+            if (plan.profileAvailable) {
+                actionContext += `\nProfile: Available (missions, skills, learning progress loaded)`;
+            }
+        }
+    } catch { /* non-fatal */ }
 
     let reply: string;
     let usedAI = false;
@@ -841,23 +895,30 @@ async function handleFreeChat(
         reply = await aiRouter("chat", `You are THE SYSTEM from Solo Leveling — an AI Discipline Operating System.
 
 CURRENT HUNTER STATE:
-${context.full}
+${context.full}${actionContext}
 
 CRITICAL RULES:
 - Your answers must reference the Hunter's ACTUAL data above.
 - Never make up tasks, scores, or stats. Use only what's provided.
 - If the question is about tasks/progress, reference activeHabits data.
 - If about performance, reference behavior analysis data.
-- Keep responses to 2-5 sentences. Be commanding and direct.
+- ALWAYS end your response with a specific directive: what the Hunter should do NEXT.
+- Include estimated time when giving task recommendations.
+- Use the ACTION PLAN data to give specific, prioritized guidance.
+- Format: Brief status assessment → Analysis → Specific directive.
+- Keep responses to 3-8 sentences. Be commanding and direct.
 - Address as "Hunter". No casual language. No emojis.
 - Plain text only. No markdown.
 
 Hunter's message: "${cmd.originalMessage}"`);
         usedAI = true;
     } catch {
-        reply = `Hunter. System processing encountered resistance. Your current state: Level ${state.hunter.level}, ` +
-            `Discipline ${state.hunter.disciplineScore}%, Streak ${state.hunter.streak} days. ` +
-            `${state.weakHabits.length > 0 ? `Focus on: ${state.weakHabits[0]}.` : "Continue your current trajectory."} Execute.`;
+        // v4: Enhanced fallback with tactical guidance
+        const remaining = state.activeHabits.filter(h => h.progress < 100);
+        const nextTask = remaining[0];
+        reply = `Hunter. Level ${state.hunter.level}, Discipline ${state.hunter.disciplineScore}%, Streak ${state.hunter.streak} days. ` +
+            `${remaining.length} tasks remaining today. ` +
+            `${nextTask ? `Priority objective: ${nextTask.name}. Begin immediately.` : "All objectives met. Stand by."}`;
     }
 
     // v3: Shadow coach reviews all AI responses

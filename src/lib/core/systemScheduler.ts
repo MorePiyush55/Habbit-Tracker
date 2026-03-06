@@ -27,6 +27,7 @@ import SystemMessage from "@/models/SystemMessage";
 import { emit, createEvent } from "./eventBus";
 import { recallMemory, refreshWeeklyInsights, shouldRefreshWeekly, incrementMetrics } from "./systemMemory";
 import { buildSystemState } from "./systemState";
+import { generateActionPlan } from "./actionPlanner";
 import type { SystemEventType } from "@/types";
 
 // ============================================================
@@ -407,7 +408,7 @@ export async function generateAutonomousAlerts(
     const alerts: AutonomousAlert[] = [];
 
     for (const event of result.eventsEmitted) {
-        const alert = translateEventToAlert(event, result);
+        const alert = await translateEventToAlert(event, result, userId);
         if (alert) alerts.push(alert);
     }
 
@@ -428,16 +429,28 @@ export async function generateAutonomousAlerts(
     return alerts;
 }
 
-function translateEventToAlert(
+async function translateEventToAlert(
     eventType: string,
-    result: SchedulerResult
-): AutonomousAlert | null {
+    result: SchedulerResult,
+    userId: string
+): Promise<AutonomousAlert | null> {
     switch (eventType) {
-        case "INACTIVITY":
+        case "INACTIVITY": {
+            // v4: Include action plan in inactivity alert
+            let directive = "Resume your quests immediately.";
+            try {
+                const state = await buildSystemState(userId);
+                const plan = await generateActionPlan(userId, state);
+                if (plan.immediateActions.length > 0) {
+                    directive = `Priority objective: ${plan.immediateActions[0].task}.\n` +
+                        `Estimated time: ${plan.immediateActions[0].estimatedMinutes} minutes.\n\nResume training immediately.`;
+                }
+            } catch { /* non-fatal */ }
             return {
                 agent: "SYSTEM",
-                text: "⚠ SYSTEM ALERT\n\nHunter.\n\nYou have been inactive. Your training stalls.\n\nResume your quests immediately.",
+                text: `SYSTEM ALERT\n\nHunter.\n\nYou have been inactive. Your training stalls.\n\n${directive}`,
             };
+        }
 
         case "WEAK_PROGRESS":
             return {
