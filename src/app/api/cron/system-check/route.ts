@@ -7,7 +7,7 @@ import SkillScore from "@/models/SkillScore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // Vercel Cron: runs every hour
 // In vercel.json: { "crons": [{ "path": "/api/cron/system-check", "schedule": "0 * * * *" }] }
