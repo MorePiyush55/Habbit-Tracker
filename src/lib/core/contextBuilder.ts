@@ -153,7 +153,10 @@ function buildHunterMissionsContext(profile: Record<string, any>): string {
     if (profile.learningProgress?.length > 0) {
         const lpLines = profile.learningProgress.map((lp: any) => {
             const pct = Math.round((lp.completedUnits / lp.totalUnits) * 100);
-            return `  ${lp.name}: ${lp.completedUnits}/${lp.totalUnits} (${pct}%)`;
+            let line = `  ${lp.name}: ${lp.completedUnits}/${lp.totalUnits} (${pct}%) | ${lp.avgStudyTimeMinutes || 0}min/day`;
+            if (lp.weeklyGoal > 0) line += ` | Goal: ${lp.weeklyGoal}/week`;
+            if (lp.weakestAreas?.length > 0) line += `\n    Weak areas: ${lp.weakestAreas.join(", ")}`;
+            return line;
         });
         parts.push(`Learning Progress:\n${lpLines.join("\n")}`);
     }

@@ -13,6 +13,8 @@ const LearningProgressSchema = new Schema({
     completedUnits: { type: Number, default: 0 },     // e.g. 11 sections
     totalUnits: { type: Number, default: 1 },         // e.g. 18 sections
     avgStudyTimeMinutes: { type: Number, default: 0 }, // daily avg
+    weeklyGoal: { type: Number, default: 0 },         // e.g. 5 walkthroughs/week
+    weakestAreas: [{ type: String }],                  // e.g. ["Endpoint Security", "Cryptography"]
 }, { _id: false });
 
 const SkillRatingSchema = new Schema({
