@@ -1573,6 +1573,113 @@ body::before {
   .player-level {
     font-size: 1.6rem;
   }
+
+  /* ── Profile page mobile ── */
+  .profile-container {
+    padding: 12px !important;
+  }
+
+  .profile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .profile-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Stack grid tables into cards */
+  .profile-learning-row {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    margin-bottom: 10px !important;
+  }
+
+  .profile-learning-row input[type="number"] {
+    text-align: left !important;
+  }
+
+  .profile-weekly-row {
+    grid-template-columns: 1fr 1fr auto !important;
+    gap: 8px !important;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    margin-bottom: 10px !important;
+  }
+
+  .profile-time-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tasks page mobile */
+  .tasks-page {
+    padding: 12px 8px;
+    gap: 10px;
+  }
+
+  .tasks-header {
+    padding: 14px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  /* Modal mobile */
+  .modal-content {
+    max-width: calc(100vw - 24px) !important;
+    max-height: 90vh !important;
+    margin: 12px;
+    overflow-y: auto;
+  }
+
+  /* Quest panel mobile */
+  .quest-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .quest-meta {
+    flex-wrap: wrap;
+  }
+
+  /* Nav mobile */
+  .app-nav {
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .nav-title {
+    display: none;
+  }
+
+  .nav-links {
+    margin-left: 8px;
+    gap: 2px;
+  }
+
+  .nav-link {
+    padding: 6px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .nav-link svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* System console on dashboard - shorter on mobile */
+  .main-content > div:last-child {
+    height: 400px !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1583,6 +1690,30 @@ body::before {
 
   .stat-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* Profile extra-small */
+  .profile-container {
+    padding: 8px !important;
+  }
+
+  .glass-card {
+    padding: 12px !important;
+  }
+
+  .profile-learning-row {
+    padding: 10px;
+  }
+
+  /* Skill rating row mobile */
+  .profile-skill-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .profile-skill-row span:first-child {
+    min-width: 100% !important;
+    font-size: 0.85rem;
   }
 }
 

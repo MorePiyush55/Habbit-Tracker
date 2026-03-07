@@ -181,9 +181,9 @@ export default function ProfilePage() {
     return (
         <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
             <AppNav />
-            <div style={{ maxWidth: 800, margin: "0 auto", padding: "var(--space-lg)" }}>
+            <div className="profile-container" style={{ maxWidth: 800, margin: "0 auto", padding: "var(--space-lg)" }}>
                 {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-xl)" }}>
+                <div className="profile-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-xl)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
                         <button onClick={() => router.push("/")} className="btn-ghost" style={{ padding: 8 }}>
                             <ArrowLeft size={20} />
@@ -244,7 +244,7 @@ export default function ProfilePage() {
                         Courses, certifications, or study programs you&apos;re working through.
                     </p>
                     {profile.learningProgress.map((lp) => (
-                        <div key={lp._uid} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
+                        <div key={lp._uid} className="profile-learning-row" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
                             <input
                                 className="game-input"
                                 placeholder="Course name"
@@ -339,7 +339,7 @@ export default function ProfilePage() {
                         Recurring weekly goals (e.g. job applications, client outreach).
                     </p>
                     {profile.weeklyTargets.map((wt) => (
-                        <div key={wt._uid} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
+                        <div key={wt._uid} className="profile-weekly-row" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", alignItems: "center" }}>
                             <input
                                 className="game-input"
                                 placeholder="Target name"
@@ -413,7 +413,7 @@ export default function ProfilePage() {
                         Rate your current skill levels (0-100). The System uses this for training recommendations.
                     </p>
                     {profile.skillRatings.map((sr, i) => (
-                        <div key={`sr-${sr.name}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+                        <div key={`sr-${sr.name}`} className="profile-skill-row" style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
                             <span style={{ minWidth: 120, fontSize: "0.9rem", color: "var(--text-secondary)" }}>{sr.name}</span>
                             <input
                                 type="range"
@@ -460,7 +460,7 @@ export default function ProfilePage() {
                         <Clock size={18} style={{ color: "var(--accent-yellow, #fbbf24)" }} />
                         Time & Focus
                     </h2>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
+                    <div className="profile-time-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
                         <div>
                             <label htmlFor="profile-daily-hours" style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
                                 Daily Available Hours
