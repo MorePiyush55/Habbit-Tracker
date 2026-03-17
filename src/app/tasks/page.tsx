@@ -150,6 +150,23 @@ export default function TasksPage() {
         scheduleSync();
     };
 
+    const handleChangeRank = async (habitId: string, newRank: string) => {
+        // Optimistic update
+        setQuests(prev => prev.map(q => q._id === habitId
+            ? { ...q, rank: newRank, xpReward: { S: 120, A: 80, B: 55, C: 35, D: 20, E: 10 }[newRank] || 10 }
+            : q
+        ));
+        try {
+            await fetch(`/api/habits/${habitId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rank: newRank }),
+            });
+        } catch {
+            await fetchQuests(); // re-sync on failure
+        }
+    };
+
     // Sort: by rank (S→A→B→C→D→E), completed tasks always sink to bottom
     const RANK_ORDER: Record<string, number> = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5 };
     const sortedQuests = useMemo(() => {
@@ -317,6 +334,7 @@ export default function TasksPage() {
                         onDeleteQuest={handleDeleteQuest}
                         onEditQuest={handleEditQuest}
                         onToggleMainTask={handleToggleMainTask}
+                        onChangeRank={handleChangeRank}
                         loading={false}
                     />
                 </div>
