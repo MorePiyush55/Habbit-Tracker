@@ -7,7 +7,8 @@ interface GeneratedQuest {
     _id: string;
     title: string;
     category: string;
-    difficulty: string;
+    rank: string;
+    primaryStat: string;
     subtasks: string[];
     reason: string;
     xpReward: number;
@@ -78,10 +79,13 @@ export default function DailyStrategyPanel() {
         }
     };
 
-    const difficultyColors: Record<string, string> = {
-        small: "#00ff88",
-        medium: "#ffaa00",
-        hard: "#ff4444"
+    const rankColors: Record<string, string> = {
+        "E": "#00ff88",
+        "D": "#00ff88",
+        "C": "#ffaa00",
+        "B": "#ffaa00",
+        "A": "#ff4444",
+        "S": "#ff4444"
     };
 
     return (
@@ -211,7 +215,7 @@ export default function DailyStrategyPanel() {
                                     background: "rgba(0,0,0,0.3)",
                                     borderRadius: "8px",
                                     padding: "14px",
-                                    borderLeft: `3px solid ${difficultyColors[quest.difficulty] || "#8b5cf6"}`,
+                                    borderLeft: `3px solid ${rankColors[quest.rank || "E"]} `,
                                     opacity: (quest.accepted || quest.rejected) ? 0.5 : 1
                                 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -220,7 +224,7 @@ export default function DailyStrategyPanel() {
                                                 {quest.title}
                                             </div>
                                             <div style={{ fontSize: "0.7rem", color: "#888", marginTop: 2 }}>
-                                                {quest.category} • {quest.difficulty.toUpperCase()} • {quest.xpReward} XP
+                                                {quest.category} • {quest.rank}-Rank • {quest.primaryStat} • {quest.xpReward} XP
                                             </div>
                                             {quest.reason && (
                                                 <div style={{ fontSize: "0.72rem", color: "#ff8800", marginTop: 6, fontStyle: "italic" }}>

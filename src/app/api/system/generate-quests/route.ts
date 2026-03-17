@@ -48,12 +48,12 @@ export async function POST(req: Request) {
         }
 
         if (action === "accept") {
-            // Convert the generated quest into an actual habit
             await createHabit(userId, {
                 title: quest.title,
-                category: quest.category,
-                difficulty: quest.difficulty,
-                xpReward: quest.xpReward,
+                category: "Generative",
+                rank: quest.rank || "E",
+                primaryStat: quest.primaryStat || "STR",
+                xpReward: quest.xpReward || 10,
                 subtasks: quest.subtasks,
                 isDaily: false
             });

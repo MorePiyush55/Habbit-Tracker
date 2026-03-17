@@ -8,9 +8,10 @@ import { calculateXP } from "@/lib/game-engine/xpSystem";
 import { getLevelFromXP } from "@/lib/game-engine/levelSystem";
 import { calculateStreak } from "@/lib/game-engine/streakSystem";
 import { incrementConsecutiveCompletion } from "@/lib/game-engine/difficultyScaler";
+import { calculateQuestCompletion, calculateRequiredXpForLevel, getHunterRankLetter, QuestDifficulty } from "@/lib/game-engine/engine";
 import BehaviorLog from "@/models/BehaviorLog";
 import { Difficulty } from "@/types";
-import { emit, SystemEvents } from "@/lib/core/eventBus";
+import { emit, createEvent, SystemEvents } from "@/lib/core/eventBus";
 
 export async function getTodayProgress(userId: string, date: string) {
     await connectDB();
@@ -125,8 +126,30 @@ export async function toggleSubtaskProgress(
         }
     }
 
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+
+    let isWeakestStat = false;
+    if (user.stats && habit.primaryStat) {
+        const statsObj = user.stats as Record<string, { value: number; xp: number }>;
+        const primaryStatValue = statsObj[habit.primaryStat]?.value || 10;
+        const allValues = Object.values(statsObj).map(s => s.value || 10);
+        const minStat = Math.min(...allValues);
+        if (primaryStatValue === minStat) {
+            isWeakestStat = true;
+        }
+    }
+
+    const { totalXP: calculatedXP, totalGold, statXPGained } = calculateQuestCompletion(
+        (habit.rank || "E") as QuestDifficulty,
+        user.currentStreak || 0,
+        isWeakestStat
+    );
+
     const subtaskCount = await Subtask.countDocuments({ habitId });
-    const xpPerSubtask = subtaskCount > 0 ? Math.floor(habit.xpReward / subtaskCount) : habit.xpReward;
+    const xpPerSubtask = subtaskCount > 0 ? Math.floor(calculatedXP / subtaskCount) : calculatedXP;
+    const goldPerSubtask = subtaskCount > 0 ? Math.floor(totalGold / subtaskCount) : totalGold;
+    const statXpPerSubtask = subtaskCount > 0 ? Math.floor(statXPGained / subtaskCount) : statXPGained;
 
     // Build query — use null for main-task entries (no subtask)
     const entryQuery: Record<string, unknown> = { userId, date, habitId };
@@ -140,6 +163,8 @@ export async function toggleSubtaskProgress(
     const existingEntry = await ProgressEntry.findOne(entryQuery);
 
     let xpDelta = 0;
+    let goldDelta = 0;
+    let statXpDelta = 0;
 
     if (existingEntry) {
         const wasCompleted = existingEntry.completed;
@@ -147,8 +172,15 @@ export async function toggleSubtaskProgress(
         existingEntry.xpEarned = completed ? xpPerSubtask : 0;
         await existingEntry.save();
 
-        if (completed && !wasCompleted) xpDelta = xpPerSubtask;
-        else if (!completed && wasCompleted) xpDelta = -xpPerSubtask;
+        if (completed && !wasCompleted) {
+            xpDelta = xpPerSubtask;
+            goldDelta = goldPerSubtask;
+            statXpDelta = statXpPerSubtask;
+        } else if (!completed && wasCompleted) {
+            xpDelta = -xpPerSubtask;
+            goldDelta = -goldPerSubtask;
+            statXpDelta = -statXpPerSubtask;
+        }
     } else {
         await ProgressEntry.create({
             dailyProgressId: dailyProgress._id,
@@ -159,34 +191,58 @@ export async function toggleSubtaskProgress(
             completed,
             xpEarned: completed ? xpPerSubtask : 0,
         });
-        if (completed) xpDelta = xpPerSubtask;
+        if (completed) {
+            xpDelta = xpPerSubtask;
+            goldDelta = goldPerSubtask;
+            statXpDelta = statXpPerSubtask;
+        }
     }
 
-    // Update user XP and Boss Raid HP
+    // Update user XP, Gold, Stats, and Boss Raid HP
     let raidCleared = false;
     if (xpDelta !== 0) {
-        const user = await User.findById(userId);
-        if (user) {
-            user.totalXP = Math.max(0, user.totalXP + xpDelta);
+        user.totalXP = Math.max(0, user.totalXP + xpDelta);
+        user.gold = Math.max(0, (user.gold || 0) + goldDelta);
 
-            // Phase 5: Weekly Boss Raid Damage Logic
-            if (xpDelta > 0 && !user.bossDefeatedThisWeek) {
-                user.weeklyBossHP = Math.max(0, (user.weeklyBossHP || 500) - xpDelta);
-
-                // Check if Boss is defeated (HP drained AND 5 day streak maintained)
-                if (user.weeklyBossHP === 0 && user.currentStreak >= 5) {
-                    user.bossDefeatedThisWeek = true;
-                    raidCleared = true;
-                    user.totalXP += 300; // Boss Reward
-                }
-            } else if (xpDelta < 0 && !user.bossDefeatedThisWeek) {
-                // If they uncheck a task, boss regains HP
-                user.weeklyBossHP = Math.min(500, (user.weeklyBossHP || 500) - xpDelta);
+        // Update Specific Stat XP
+        if (habit.primaryStat && user.stats && user.stats[habit.primaryStat]) {
+            user.stats[habit.primaryStat].xp = Math.max(0, user.stats[habit.primaryStat].xp + statXpDelta);
+            
+            // 100 Stat XP = 1 Stat Value Point
+            while (user.stats[habit.primaryStat].xp >= 100) {
+                user.stats[habit.primaryStat].xp -= 100;
+                user.stats[habit.primaryStat].value += 1;
             }
-
-            user.level = getLevelFromXP(user.totalXP);
-            await user.save();
         }
+
+        // Phase 5: Weekly Boss Raid Damage Logic
+        if (xpDelta > 0 && !user.bossDefeatedThisWeek) {
+            user.weeklyBossHP = Math.max(0, (user.weeklyBossHP || 500) - xpDelta);
+
+            // Check if Boss is defeated (HP drained AND 5 day streak maintained)
+            if (user.weeklyBossHP === 0 && user.currentStreak >= 5) {
+                user.bossDefeatedThisWeek = true;
+                raidCleared = true;
+                user.totalXP += 300; // Boss XP Reward
+                user.gold += 100; // Boss Gold Reward
+            }
+        } else if (xpDelta < 0 && !user.bossDefeatedThisWeek) {
+            // If they uncheck a task, boss regains HP
+            user.weeklyBossHP = Math.min(500, (user.weeklyBossHP || 500) - xpDelta);
+        }
+
+        // Check for Global Level Up using new curve
+        let newLevel = user.level || 1;
+        while (user.totalXP >= calculateRequiredXpForLevel(newLevel + 1)) {
+            newLevel++;
+            user.statPoints = (user.statPoints || 0) + 3; // +3 stat points per level
+        }
+        user.level = newLevel;
+        user.hunterRank = getHunterRankLetter(newLevel) + "-Class";
+        
+        // Ensure changes to stats subdocument are recorded
+        user.markModified('stats');
+        await user.save();
     }
 
     // Recalculate daily progress
@@ -324,6 +380,57 @@ export async function toggleSubtaskProgress(
     return { totalXP, completionRate, bossDefeated, xpDelta };
 }
 
+export async function processTakeDamage(userId: string, damageAmount: number) {
+    await connectDB();
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+
+    const maxHp = user.maxHp || 100;
+    user.hp = Math.max(0, (user.hp ?? 100) - damageAmount);
+
+    let systemPurged = false;
+
+    // The System Purge (Death Penalty)
+    if (user.hp <= 0) {
+        systemPurged = true;
+        user.hp = maxHp;
+        
+        // Lose 1 Level (minimum Level 1)
+        user.level = Math.max(1, (user.level || 1) - 1);
+        user.hunterRank = getHunterRankLetter(user.level) + "-Class";
+        
+        // XP resets to the base of their current level
+        user.totalXP = calculateRequiredXpForLevel(user.level);
+        
+        // Lose 50% Gold
+        user.gold = Math.floor((user.gold || 0) / 2);
+    }
+
+    await user.save();
+
+    // Emit event for UI to catch
+    if (systemPurged) {
+        await emit(createEvent("SYSTEM_PURGE" as any, userId, { 
+            message: "HP depleted. The System has purged your recent progress. Level down.",
+            hp: maxHp, 
+            level: user.level 
+        }));
+    } else {
+        await emit(createEvent("DAMAGE_TAKEN" as any, userId, { 
+            damage: damageAmount, 
+            remainingHp: user.hp 
+        }));
+    }
+
+    return { 
+        hp: user.hp, 
+        maxHp: user.maxHp, 
+        systemPurged,
+        level: user.level,
+        gold: user.gold
+    };
+}
+
 export async function getProgressHistory(userId: string, days: number = 30) {
     await connectDB();
     return DailyProgress.find({ userId })
@@ -331,3 +438,4 @@ export async function getProgressHistory(userId: string, days: number = 30) {
         .limit(days)
         .lean();
 }
+

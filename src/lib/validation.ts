@@ -3,8 +3,9 @@ import { z } from "zod";
 export const habitSchema = z.object({
     title: z.string().min(1, "Title is required"),
     category: z.string().min(1, "Category is required"),
-    difficulty: z.enum(["small", "medium", "hard"]),
-    xpReward: z.number().min(1).max(100),
+    rank: z.enum(["E", "D", "C", "B", "A", "S"]),
+    primaryStat: z.enum(["STR", "VIT", "INT", "AGI", "PER", "CHA"]),
+    xpReward: z.number().optional(),
     order: z.number().optional(),
     isActive: z.boolean().optional(),
     subtasks: z.array(z.string()).optional(),

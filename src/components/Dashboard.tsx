@@ -8,9 +8,11 @@ import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
-import SystemConsole from "@/components/system/SystemConsole";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
+import SystemStore from "@/components/game/SystemStore";
+import HabitHeatmap from "@/components/game/HabitHeatmap";
+import InventoryPanel from "@/components/game/InventoryPanel";
 import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AppNav from "@/components/AppNav";
@@ -60,10 +62,19 @@ export default function Dashboard() {
         currentStreak: statsData?.user?.currentStreak || 0,
         longestStreak: statsData?.user?.longestStreak || 0,
         level: statsData?.user?.level || 1,
+        gold: statsData?.user?.gold || 0,
+        statPoints: statsData?.user?.statPoints || 0,
+        stats: statsData?.user?.stats || {
+            STR: { value: 10, xp: 0 }, VIT: { value: 10, xp: 0 }, INT: { value: 10, xp: 0 },
+            AGI: { value: 10, xp: 0 }, PER: { value: 10, xp: 0 }, CHA: { value: 10, xp: 0 }
+        },
         disciplineScore: statsData?.user?.disciplineScore || 50,
         focusScore: statsData?.user?.focusScore || 50,
         skillGrowthScore: statsData?.user?.skillGrowthScore || 50,
         hunterRank: statsData?.user?.hunterRank || "E-Class",
+        jobClass: statsData?.user?.jobClass || "F-Rank Recruit",
+        hp: statsData?.user?.hp ?? 100,
+        maxHp: statsData?.user?.maxHp ?? 100,
         weeklyBossHP: statsData?.user?.weeklyBossHP || 500,
         bossDefeatedThisWeek: statsData?.user?.bossDefeatedThisWeek || false,
     };
@@ -151,9 +162,25 @@ export default function Dashboard() {
                         totalXP={userStats.totalXP}
                         currentStreak={userStats.currentStreak}
                         longestStreak={userStats.longestStreak}
+                        level={userStats.level}
+                        gold={userStats.gold}
+                        statPoints={userStats.statPoints}
+                        hp={userStats.hp}
+                        maxHp={userStats.maxHp}
+                        stats={userStats.stats}
                         disciplineScore={userStats.disciplineScore}
                         hunterRank={userStats.hunterRank}
                     />
+
+                    {/* Phase 4: Inventory Panel */}
+                    <div style={{ marginTop: "1rem", minHeight: "400px" }}>
+                        <InventoryPanel 
+                            jobClass={userStats.jobClass} 
+                            inventory={[]} // Placeholder until backend item generation is implemented
+                            equipped={{ weapon: null, armor: null, accessory: null }}
+                            baseStats={userStats.stats}
+                        />
+                    </div>
 
                     {/* Active Training — above achievements */}
                     <ActiveTrainingUI />
@@ -173,9 +200,27 @@ export default function Dashboard() {
                     {/* 2. Daily Strategy — MIDDLE */}
                     <DailyStrategyPanel />
 
-                    {/* 3. System Console — BOTTOM */}
-                    <div style={{ height: "500px" }}>
-                        <SystemConsole />
+                    {/* Phase 4: Habit Heatmap */}
+                    <div style={{ marginBottom: "1rem" }}>
+                        <HabitHeatmap data={statsData?.heatmapData || []} />
+                    </div>
+
+                    {/* 3. System Store — MIDDLE */}
+                    <div style={{ marginBottom: "1rem" }}>
+                        <SystemStore 
+                            gold={userStats.gold} 
+                            hp={userStats.hp} 
+                            maxHp={userStats.maxHp} 
+                            onPurchaseSuccess={() => {
+                                import("swr").then(({ mutate }) => {
+                                    mutate(
+                                        (key) => typeof key === "string" && key.startsWith("/api/analytics"),
+                                        undefined,
+                                        { revalidate: true }
+                                    );
+                                });
+                            }} 
+                        />
                     </div>
                 </div>
 

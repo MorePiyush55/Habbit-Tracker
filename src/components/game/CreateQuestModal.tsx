@@ -21,8 +21,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("Learning");
     const [customCategory, setCustomCategory] = useState("");
-    const [difficulty, setDifficulty] = useState<"small" | "medium" | "hard" | "custom">("medium");
-    const [customXp, setCustomXp] = useState(30);
+    const [rank, setRank] = useState<"E" | "D" | "C" | "B" | "A" | "S">("E");
+    const [primaryStat, setPrimaryStat] = useState<"STR" | "VIT" | "INT" | "AGI" | "PER" | "CHA">("STR");
     const subtaskIdRef = useRef(1);
     const [subtasks, setSubtasks] = useState<{id: number, text: string}[]>([{id: 0, text: ""}]);
     const [scheduleType, setScheduleType] = useState<"daily" | "today" | "custom">("daily");
@@ -57,7 +57,6 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
 
         try {
             const validSubtasks = subtasks.map(s => s.text).filter(t => t.trim() !== "");
-            const xpReward = difficulty === "custom" ? customXp : difficulty === "small" ? 10 : difficulty === "medium" ? 25 : 50;
             const finalCategory = category === "Custom" ? customCategory : category;
 
             const isDaily = scheduleType === "daily";
@@ -67,8 +66,9 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             const payload: Record<string, unknown> = {
                 title,
                 category: finalCategory,
-                difficulty: difficulty === "custom" ? "custom" : difficulty,
-                xpReward,
+                rank,
+                primaryStat,
+                xpReward: 10, // Default fallback, but game engine calculates exact amount
                 subtasks: validSubtasks,
                 isDaily,
             };
@@ -91,8 +91,8 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             setTitle("");
             setCategory("Learning");
             setCustomCategory("");
-            setDifficulty("medium");
-            setCustomXp(30);
+            setRank("E");
+            setPrimaryStat("STR");
             setScheduleType("daily");
             subtaskIdRef.current = 1;
             setSubtasks([{id: 0, text: ""}]);
@@ -174,37 +174,39 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         </div>
                     )}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginTop: "1rem" }}>
                         <div className="form-group">
-                            <label htmlFor="create-quest-difficulty">Difficulty</label>
+                            <label htmlFor="create-quest-rank">Quest Rank</label>
                             <select
-                                id="create-quest-difficulty"
-                                value={difficulty}
-                                onChange={e => setDifficulty(e.target.value as "small" | "medium" | "hard" | "custom")}
+                                id="create-quest-rank"
+                                value={rank}
+                                onChange={e => setRank(e.target.value as any)}
                                 className="game-input"
                             >
-                                <option value="small">E-Rank (10 XP)</option>
-                                <option value="medium">C-Rank (25 XP)</option>
-                                <option value="hard">A-Rank (50 XP)</option>
-                                <option value="custom">Custom XP</option>
+                                <option value="E">E-Rank (10 XP, Easy)</option>
+                                <option value="D">D-Rank (20 XP, Moderate)</option>
+                                <option value="C">C-Rank (35 XP, Hard)</option>
+                                <option value="B">B-Rank (55 XP, Very Hard)</option>
+                                <option value="A">A-Rank (80 XP, Extreme)</option>
+                                <option value="S">S-Rank (120 XP, Boss)</option>
                             </select>
                         </div>
-
-                        {difficulty === "custom" && (
-                            <div className="form-group">
-                                <label htmlFor="create-quest-xp">XP Reward</label>
-                                <input
-                                    id="create-quest-xp"
-                                    type="number"
-                                    required
-                                    min={1}
-                                    max={500}
-                                    value={customXp}
-                                    onChange={e => setCustomXp(Number(e.target.value))}
-                                    className="game-input"
-                                />
-                            </div>
-                        )}
+                        <div className="form-group">
+                            <label htmlFor="create-quest-stat">Target Stat</label>
+                            <select
+                                id="create-quest-stat"
+                                value={primaryStat}
+                                onChange={e => setPrimaryStat(e.target.value as any)}
+                                className="game-input"
+                            >
+                                <option value="STR">STR - Strength (Fitness/Health)</option>
+                                <option value="VIT">VIT - Vitality (Recovery/Sleep)</option>
+                                <option value="INT">INT - Intelligence (Study/Coding)</option>
+                                <option value="AGI">AGI - Agility (Inbox/Speed Tasks)</option>
+                                <option value="PER">PER - Perception (Planning/Focus)</option>
+                                <option value="CHA">CHA - Charisma (Networking/Speaking)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="form-group">

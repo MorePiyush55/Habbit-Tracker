@@ -15,7 +15,8 @@ export interface Quest {
     _id: string;
     title: string;
     category: string;
-    difficulty: string;
+    rank?: string;
+    primaryStat?: string;
     xpReward: number;
     subtasks: Subtask[];
     completionPercent: number;
@@ -103,8 +104,8 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                         {quest.title}
                                     </div>
                                     <div className="quest-meta">
-                                        <span className={`badge badge-difficulty-${quest.difficulty}`}>
-                                            {quest.difficulty}
+                                        <span className="badge badge-rank" style={{ background: "rgba(255, 255, 255, 0.1)", color: "var(--text-primary)", border: "1px solid rgba(255, 255, 255, 0.3)" }}>
+                                            {quest.rank || "E"}-Rank
                                         </span>
                                         <span className="badge badge-xp">
                                             <Zap size={11} /> {quest.xpReward} XP

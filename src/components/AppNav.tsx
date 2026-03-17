@@ -23,10 +23,6 @@ export default function AppNav() {
                     <CheckSquare size={16} />
                     Tasks
                 </Link>
-                <Link href="/console" className={`nav-link ${pathname === "/console" ? "active" : ""}`}>
-                    <Terminal size={16} />
-                    System Console
-                </Link>
                 <Link href="/profile" className={`nav-link ${pathname === "/profile" ? "active" : ""}`}>
                     <Shield size={16} />
                     Profile

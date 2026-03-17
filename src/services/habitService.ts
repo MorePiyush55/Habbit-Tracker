@@ -20,8 +20,9 @@ export async function getHabits(userId: string) {
 export async function createHabit(userId: string, data: {
     title: string;
     category: string;
-    difficulty: string;
-    xpReward: number;
+    rank?: string;
+    primaryStat?: string;
+    xpReward?: number;
     order?: number;
     subtasks?: string[];
     deadline?: string;
@@ -37,8 +38,9 @@ export async function createHabit(userId: string, data: {
         userId,
         title: data.title,
         category: data.category,
-        difficulty: data.difficulty,
-        xpReward: data.xpReward,
+        rank: data.rank || "E",
+        primaryStat: data.primaryStat || "STR",
+        xpReward: data.xpReward || 10,
         order: data.order || 0,
         isActive: true,
         isDaily: data.isDaily ?? true,
@@ -85,7 +87,8 @@ export async function seedDefaultTasks(userId: string) {
 export async function updateHabit(habitId: string, data: Partial<{
     title: string;
     category: string;
-    difficulty: string;
+    rank: string;
+    primaryStat: string;
     xpReward: number;
     order: number;
     isActive: boolean;

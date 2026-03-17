@@ -5,7 +5,10 @@ const HabitSchema = new Schema(
         userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
         title: { type: String, required: true },
         category: { type: String, required: true },
-        difficulty: { type: String, enum: ["small", "medium", "hard"], required: true },
+        // RPG Phase 2 Addition: Quest Rank and Stat Association
+        rank: { type: String, enum: ["E", "D", "C", "B", "A", "S"], required: true, default: "E" },
+        primaryStat: { type: String, enum: ["STR", "VIT", "INT", "AGI", "PER", "CHA"], required: true, default: "STR" },
+        
         xpReward: { type: Number, required: true },
         order: { type: Number, default: 0 },
         isActive: { type: Boolean, default: true },
