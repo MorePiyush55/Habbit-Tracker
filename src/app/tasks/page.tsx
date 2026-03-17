@@ -150,11 +150,16 @@ export default function TasksPage() {
         scheduleSync();
     };
 
-    // Sort: incomplete quests first, completed quests at the bottom
+    // Sort: by rank (S→A→B→C→D→E), completed tasks always sink to bottom
+    const RANK_ORDER: Record<string, number> = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5 };
     const sortedQuests = useMemo(() => {
         return [...quests].sort((a, b) => {
-            if (a.isFullyCompleted === b.isFullyCompleted) return 0;
-            return a.isFullyCompleted ? 1 : -1;
+            // Completed tasks always go to bottom
+            if (a.isFullyCompleted !== b.isFullyCompleted) return a.isFullyCompleted ? 1 : -1;
+            // Within same completion group, sort by rank (highest first)
+            const rankA = RANK_ORDER[a.rank ?? "E"] ?? 5;
+            const rankB = RANK_ORDER[b.rank ?? "E"] ?? 5;
+            return rankA - rankB;
         });
     }, [quests]);
 
