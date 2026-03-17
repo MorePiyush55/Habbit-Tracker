@@ -13,7 +13,6 @@ import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import SystemStore from "@/components/game/SystemStore";
 import HabitHeatmap from "@/components/game/HabitHeatmap";
 import InventoryPanel from "@/components/game/InventoryPanel";
-import ActiveTrainingUI from "@/components/system/ActiveTrainingUI";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AppNav from "@/components/AppNav";
 
@@ -181,9 +180,6 @@ export default function Dashboard() {
                             baseStats={userStats.stats}
                         />
                     </div>
-
-                    {/* Active Training — above achievements */}
-                    <ActiveTrainingUI />
 
                     <AchievementBadges unlockedIds={[]} />
                 </div>

@@ -1,0 +1,91 @@
+﻿node.exe : npm verbose 
+cli C:\Program 
+Files\nodejs\node.exe C
+:\Users\piyus\AppData\R
+oaming\npm\node_modules
+\npm\bin\npm-cli.js
+At C:\Users\piyus\AppDa
+ta\Roaming\npm\npm.ps1:
+24 char:5
++     & "node$exe"  "$b
+asedir/node_modules/npm
+/bin/npm-cli.js" $args
++     ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (npm verbose c   
+ li...\bin\npm-cli.    
+js:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+npm info using 
+npm@11.10.1
+npm info using 
+node@v24.11.1
+npm verbose title npm 
+test
+npm verbose argv 
+"test" "--loglevel" 
+"verbose"
+npm verbose logfile 
+logs-max:10 dir:C:\User
+s\piyus\AppData\Local\n
+pm-cache\_logs\2026-03-
+17T18_13_24_444Z-
+npm verbose logfile C:\
+Users\piyus\AppData\Loc
+al\npm-cache\_logs\2026
+-03-17T18_13_24_444Z-de
+bug-0.log
+
+> solo-leveling-tracker@0.1.0 test
+> jest --config jest.config.ts
+
+(node:24332) 
+[MONGOOSE] Warning: 
+mongoose: Duplicate 
+schema index on 
+{"userId":1} for model 
+"SystemMemory". This 
+is often due to 
+declaring an index 
+using both "index: 
+true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+PASS tests/services/hab
+itService.test.ts
+PASS tests/services/pro
+gressService.test.ts
+
+Test Suites: 2 passed, 
+2 total
+Tests:       8 passed, 
+8 total
+Snapshots:   0 total
+Time:        4.156 s
+Ran all test suites.
+npm verbose cwd C:\User
+s\piyus\AppData\Local\P
+rograms\Python\Python31
+3\project\Habbit Tracke
+r\solo-leveling-tracker
+npm verbose os 
+Windows_NT 10.0.26200
+npm verbose node 
+v24.11.1
+npm verbose npm  
+v11.10.1
+npm verbose exit 0
+npm info ok

@@ -17,6 +17,8 @@ export default function TasksPage() {
     const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingToggles = useRef(0);
+    const [fixingRanks, setFixingRanks] = useState(false);
+    const [rankFixMsg, setRankFixMsg] = useState("");
 
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -213,6 +215,39 @@ export default function TasksPage() {
                         >
                             + Add Quest
                         </button>
+                        <button
+                            onClick={async () => {
+                                setFixingRanks(true);
+                                setRankFixMsg("");
+                                try {
+                                    const res = await fetch("/api/habits/fix-ranks");
+                                    const data = await res.json();
+                                    setRankFixMsg(data.message || "Done!");
+                                    fetchQuests();
+                                } catch {
+                                    setRankFixMsg("Fix failed.");
+                                } finally {
+                                    setFixingRanks(false);
+                                    setTimeout(() => setRankFixMsg(""), 4000);
+                                }
+                            }}
+                            disabled={fixingRanks}
+                            style={{
+                                background: "rgba(255,170,0,0.15)",
+                                border: "1px solid rgba(255,170,0,0.4)",
+                                color: "#ffaa00",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                cursor: fixingRanks ? "not-allowed" : "pointer",
+                                fontSize: "0.78rem",
+                                fontWeight: 600
+                            }}
+                        >
+                            {fixingRanks ? "Fixing..." : "⚡ Fix Ranks"}
+                        </button>
+                        {rankFixMsg && (
+                            <span style={{ fontSize: "0.72rem", color: "#00ff88", marginLeft: 8 }}>{rankFixMsg}</span>
+                        )}
                     </div>
                 </div>
 

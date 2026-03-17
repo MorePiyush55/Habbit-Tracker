@@ -172,7 +172,7 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                         </div>
                     )}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginTop: "1rem", marginBottom: "1rem" }}>
+                    <div style={{ marginTop: "1rem", marginBottom: "1rem" }}>
                         <div className="form-group">
                             <label htmlFor="edit-quest-rank">Quest Rank</label>
                             <select
@@ -187,22 +187,6 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                                 <option value="B">B-Rank (55 XP, Very Hard)</option>
                                 <option value="A">A-Rank (80 XP, Extreme)</option>
                                 <option value="S">S-Rank (120 XP, Boss)</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="edit-quest-stat">Target Stat</label>
-                            <select
-                                id="edit-quest-stat"
-                                value={primaryStat}
-                                onChange={(e) => setPrimaryStat(e.target.value as any)}
-                                className="game-input"
-                            >
-                                <option value="STR">STR - Strength (Fitness/Health)</option>
-                                <option value="VIT">VIT - Vitality (Recovery/Sleep)</option>
-                                <option value="INT">INT - Intelligence (Study/Coding)</option>
-                                <option value="AGI">AGI - Agility (Inbox/Speed Tasks)</option>
-                                <option value="PER">PER - Perception (Planning/Focus)</option>
-                                <option value="CHA">CHA - Charisma (Networking/Speaking)</option>
                             </select>
                         </div>
                     </div>
