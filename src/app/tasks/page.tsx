@@ -19,6 +19,8 @@ export default function TasksPage() {
     const pendingToggles = useRef(0);
     const [fixingRanks, setFixingRanks] = useState(false);
     const [rankFixMsg, setRankFixMsg] = useState("");
+    const [cleaningTasks, setCleaningTasks] = useState(false);
+    const [cleanMsg, setCleanMsg] = useState("");
 
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -247,6 +249,40 @@ export default function TasksPage() {
                         </button>
                         {rankFixMsg && (
                             <span style={{ fontSize: "0.72rem", color: "#00ff88", marginLeft: 8 }}>{rankFixMsg}</span>
+                        )}
+                        <button
+                            onClick={async () => {
+                                if (!confirm("Remove all tasks except your 6 core daily tasks?")) return;
+                                setCleaningTasks(true);
+                                setCleanMsg("");
+                                try {
+                                    const res = await fetch("/api/habits/clean-tasks", { method: "DELETE" });
+                                    const data = await res.json();
+                                    setCleanMsg(data.message || "Done!");
+                                    fetchQuests();
+                                } catch {
+                                    setCleanMsg("Clean failed.");
+                                } finally {
+                                    setCleaningTasks(false);
+                                    setTimeout(() => setCleanMsg(""), 5000);
+                                }
+                            }}
+                            disabled={cleaningTasks}
+                            style={{
+                                background: "rgba(255,68,68,0.12)",
+                                border: "1px solid rgba(255,68,68,0.35)",
+                                color: "#ff4444",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                cursor: cleaningTasks ? "not-allowed" : "pointer",
+                                fontSize: "0.78rem",
+                                fontWeight: 600
+                            }}
+                        >
+                            {cleaningTasks ? "Cleaning..." : "🧹 Clean Tasks"}
+                        </button>
+                        {cleanMsg && (
+                            <span style={{ fontSize: "0.72rem", color: "#00ff88", marginLeft: 8 }}>{cleanMsg}</span>
                         )}
                     </div>
                 </div>

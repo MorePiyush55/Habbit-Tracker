@@ -5,6 +5,15 @@ import User from "@/models/User";
 import { DEFAULT_TASKS } from "@/lib/defaultTasks";
 import { emit, SystemEvents } from "@/lib/core/eventBus";
 
+// Canonical XP per rank — single source of truth
+const RANK_XP: Record<string, number> = {
+    E: 10, D: 20, C: 35, B: 55, A: 80, S: 120
+};
+
+function xpForRank(rank?: string): number {
+    return RANK_XP[rank || "E"] ?? 10;
+}
+
 export async function getHabits(userId: string) {
     await connectDB();
     const habits = await Habit.find({ userId, isActive: true }).sort({ order: 1 }).lean();
@@ -40,7 +49,7 @@ export async function createHabit(userId: string, data: {
         category: data.category,
         rank: data.rank || "E",
         primaryStat: data.primaryStat || "STR",
-        xpReward: data.xpReward || 10,
+        xpReward: xpForRank(data.rank), // Always derive from rank
         order: data.order || 0,
         isActive: true,
         isDaily: data.isDaily ?? true,
@@ -105,6 +114,11 @@ export async function updateHabit(habitId: string, data: Partial<{
     const updateFields: Record<string, unknown> = { ...habitFields };
     if (deadline !== undefined) {
         updateFields.deadline = deadline ? new Date(deadline) : null;
+    }
+
+    // Auto-derive xpReward from rank whenever rank is being updated
+    if (data.rank) {
+        updateFields.xpReward = xpForRank(data.rank);
     }
 
     const habit = await Habit.findByIdAndUpdate(habitId, updateFields, { new: true }).lean();
