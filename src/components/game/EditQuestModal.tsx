@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar, BookOpen, Shield, Briefcase, TrendingUp, Pen } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar, BookOpen, Shield, Briefcase, TrendingUp, Pen, Settings2 } from "lucide-react";
 import type { Quest } from "./QuestPanel";
+import RankCustomizerModal from "@/components/game/RankCustomizerModal";
+import { getRankConfigs, type RankConfig } from "@/lib/rankConfig";
 
 interface EditQuestModalProps {
     quest: Quest;
@@ -40,6 +42,13 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showRankCustomizer, setShowRankCustomizer] = useState(false);
+    const [rankConfigs, setRankConfigs] = useState<RankConfig[]>(() => getRankConfigs());
+
+    // Sync rank configs whenever the modal opens
+    useEffect(() => {
+        setRankConfigs(getRankConfigs());
+    }, [quest._id]);
 
     const handleAddSubtask = () => {
         setSubtasks(prev => [...prev, {id: subtaskIdRef.current++, text: ""}]);
@@ -174,22 +183,43 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
 
                     <div style={{ marginTop: "1rem", marginBottom: "1rem" }}>
                         <div className="form-group">
-                            <label htmlFor="edit-quest-rank">Quest Rank</label>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                <label htmlFor="edit-quest-rank" style={{ margin: 0 }}>Quest Rank</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRankCustomizer(true)}
+                                    style={{
+                                        display: "inline-flex", alignItems: "center", gap: 4,
+                                        background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)",
+                                        borderRadius: 6, color: "#c4b5fd", padding: "3px 9px",
+                                        cursor: "pointer", fontSize: "0.7rem", fontWeight: 600,
+                                    }}
+                                >
+                                    <Settings2 size={11} /> Customize
+                                </button>
+                            </div>
                             <select
                                 id="edit-quest-rank"
                                 value={rank}
-                                onChange={(e) => setRank(e.target.value as any)}
+                                onChange={(e) => setRank(e.target.value as "E" | "D" | "C" | "B" | "A" | "S")}
                                 className="game-input"
                             >
-                                <option value="E">E-Rank (10 XP, Easy)</option>
-                                <option value="D">D-Rank (20 XP, Moderate)</option>
-                                <option value="C">C-Rank (35 XP, Hard)</option>
-                                <option value="B">B-Rank (55 XP, Very Hard)</option>
-                                <option value="A">A-Rank (80 XP, Extreme)</option>
-                                <option value="S">S-Rank (120 XP, Boss)</option>
+                                {rankConfigs.map(r => (
+                                    <option key={r.key} value={r.key}>
+                                        {r.label}-Rank ({r.xp} XP, {r.name})
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>
+
+                    {showRankCustomizer && (
+                        <RankCustomizerModal
+                            isOpen={showRankCustomizer}
+                            onClose={() => setShowRankCustomizer(false)}
+                            onSaved={() => setRankConfigs(getRankConfigs())}
+                        />
+                    )}
 
                     <div className="form-group">
                         <span style={{ fontSize: 'inherit', fontWeight: 500 }}>Schedule</span>

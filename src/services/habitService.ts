@@ -49,7 +49,7 @@ export async function createHabit(userId: string, data: {
         category: data.category,
         rank: data.rank || "E",
         primaryStat: data.primaryStat || "STR",
-        xpReward: xpForRank(data.rank), // Always derive from rank
+        xpReward: data.xpReward ?? xpForRank(data.rank), // Support custom XP from frontend
         order: data.order || 0,
         isActive: true,
         isDaily: data.isDaily ?? true,
@@ -116,8 +116,10 @@ export async function updateHabit(habitId: string, data: Partial<{
         updateFields.deadline = deadline ? new Date(deadline) : null;
     }
 
-    // Auto-derive xpReward from rank whenever rank is being updated
-    if (data.rank) {
+    // Support custom XP from frontend, or auto-derive
+    if (data.xpReward !== undefined) {
+        updateFields.xpReward = data.xpReward;
+    } else if (data.rank) {
         updateFields.xpReward = xpForRank(data.rank);
     }
 

@@ -8,6 +8,7 @@ import CreateQuestModal from "@/components/game/CreateQuestModal";
 import EditQuestModal from "@/components/game/EditQuestModal";
 import AppNav from "@/components/AppNav";
 import { ListChecks } from "lucide-react";
+import { getRankConfigs } from "@/lib/rankConfig";
 
 export default function TasksPage() {
     const { data: session, status } = useSession();
@@ -151,16 +152,19 @@ export default function TasksPage() {
     };
 
     const handleChangeRank = async (habitId: string, newRank: string) => {
+        const configs = getRankConfigs();
+        const customXp = configs.find(r => r.key === newRank)?.xp || 10;
+        
         // Optimistic update
         setQuests(prev => prev.map(q => q._id === habitId
-            ? { ...q, rank: newRank, xpReward: { S: 120, A: 80, B: 55, C: 35, D: 20, E: 10 }[newRank] || 10 }
+            ? { ...q, rank: newRank, xpReward: customXp }
             : q
         ));
         try {
             await fetch(`/api/habits/${habitId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rank: newRank }),
+                body: JSON.stringify({ rank: newRank, xpReward: customXp }),
             });
         } catch {
             await fetchQuests(); // re-sync on failure
