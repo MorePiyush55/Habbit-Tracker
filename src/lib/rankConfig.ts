@@ -25,8 +25,8 @@ export function getRankConfigs(): RankConfig[] {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return DEFAULT_RANKS;
         const parsed: RankConfig[] = JSON.parse(raw);
-        // Merge — ensure all 6 keys exist even if storage has fewer
-        return DEFAULT_RANKS.map(def => parsed.find(p => p.key === def.key) ?? def);
+        if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_RANKS;
+        return parsed;
     } catch {
         return DEFAULT_RANKS;
     }

@@ -18,10 +18,7 @@ export default function TasksPage() {
     const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingToggles = useRef(0);
-    const [fixingRanks, setFixingRanks] = useState(false);
-    const [rankFixMsg, setRankFixMsg] = useState("");
-    const [cleaningTasks, setCleaningTasks] = useState(false);
-    const [cleanMsg, setCleanMsg] = useState("");
+
 
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -171,16 +168,13 @@ export default function TasksPage() {
         }
     };
 
-    // Sort: by rank (S→A→B→C→D→E), completed tasks always sink to bottom
-    const RANK_ORDER: Record<string, number> = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5 };
+    // Sort: by XP reward (highest first), completed tasks always sink to bottom
     const sortedQuests = useMemo(() => {
         return [...quests].sort((a, b) => {
             // Completed tasks always go to bottom
             if (a.isFullyCompleted !== b.isFullyCompleted) return a.isFullyCompleted ? 1 : -1;
-            // Within same completion group, sort by rank (highest first)
-            const rankA = RANK_ORDER[a.rank ?? "E"] ?? 5;
-            const rankB = RANK_ORDER[b.rank ?? "E"] ?? 5;
-            return rankA - rankB;
+            // Within same completion group, sort by XP (highest first) -> safely handles dynamic custom ranks
+            return (b.xpReward || 0) - (a.xpReward || 0);
         });
     }, [quests]);
 
@@ -243,73 +237,6 @@ export default function TasksPage() {
                         >
                             + Add Quest
                         </button>
-                        <button
-                            onClick={async () => {
-                                setFixingRanks(true);
-                                setRankFixMsg("");
-                                try {
-                                    const res = await fetch("/api/habits/fix-ranks");
-                                    const data = await res.json();
-                                    setRankFixMsg(data.message || "Done!");
-                                    fetchQuests();
-                                } catch {
-                                    setRankFixMsg("Fix failed.");
-                                } finally {
-                                    setFixingRanks(false);
-                                    setTimeout(() => setRankFixMsg(""), 4000);
-                                }
-                            }}
-                            disabled={fixingRanks}
-                            style={{
-                                background: "rgba(255,170,0,0.15)",
-                                border: "1px solid rgba(255,170,0,0.4)",
-                                color: "#ffaa00",
-                                borderRadius: 8,
-                                padding: "8px 14px",
-                                cursor: fixingRanks ? "not-allowed" : "pointer",
-                                fontSize: "0.78rem",
-                                fontWeight: 600
-                            }}
-                        >
-                            {fixingRanks ? "Fixing..." : "⚡ Fix Ranks"}
-                        </button>
-                        {rankFixMsg && (
-                            <span style={{ fontSize: "0.72rem", color: "#00ff88", marginLeft: 8 }}>{rankFixMsg}</span>
-                        )}
-                        <button
-                            onClick={async () => {
-                                if (!confirm("Remove all tasks except your 6 core daily tasks?")) return;
-                                setCleaningTasks(true);
-                                setCleanMsg("");
-                                try {
-                                    const res = await fetch("/api/habits/clean-tasks", { method: "DELETE" });
-                                    const data = await res.json();
-                                    setCleanMsg(data.message || "Done!");
-                                    fetchQuests();
-                                } catch {
-                                    setCleanMsg("Clean failed.");
-                                } finally {
-                                    setCleaningTasks(false);
-                                    setTimeout(() => setCleanMsg(""), 5000);
-                                }
-                            }}
-                            disabled={cleaningTasks}
-                            style={{
-                                background: "rgba(255,68,68,0.12)",
-                                border: "1px solid rgba(255,68,68,0.35)",
-                                color: "#ff4444",
-                                borderRadius: 8,
-                                padding: "8px 14px",
-                                cursor: cleaningTasks ? "not-allowed" : "pointer",
-                                fontSize: "0.78rem",
-                                fontWeight: 600
-                            }}
-                        >
-                            {cleaningTasks ? "Cleaning..." : "🧹 Clean Tasks"}
-                        </button>
-                        {cleanMsg && (
-                            <span style={{ fontSize: "0.72rem", color: "#00ff88", marginLeft: 8 }}>{cleanMsg}</span>
-                        )}
                     </div>
                 </div>
 

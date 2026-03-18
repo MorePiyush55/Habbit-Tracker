@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, RotateCcw, Save } from "lucide-react";
+import { X, RotateCcw, Save, Trash2, Plus } from "lucide-react";
 import { getRankConfigs, saveRankConfigs, DEFAULT_RANKS, type RankConfig } from "@/lib/rankConfig";
 
 const RANK_COLORS: Record<string, string> = {
@@ -71,9 +71,9 @@ export default function RankCustomizerModal({ isOpen, onClose, onSaved }: Props)
                 </div>
 
                 {/* Column headers */}
-                <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 90px", gap: 8, marginBottom: 8, padding: "0 6px" }}>
-                    {["Rank", "Label", "Name", "XP"].map(h => (
-                        <span key={h} style={{ fontSize: "0.65rem", color: "#555", letterSpacing: "1px", textTransform: "uppercase" }}>{h}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 90px 30px", gap: 8, marginBottom: 8, padding: "0 6px" }}>
+                    {["Rank", "Label", "Name", "XP", ""].map((h, i) => (
+                        <span key={i} style={{ fontSize: "0.65rem", color: "#555", letterSpacing: "1px", textTransform: "uppercase" }}>{h}</span>
                     ))}
                 </div>
 
@@ -83,7 +83,7 @@ export default function RankCustomizerModal({ isOpen, onClose, onSaved }: Props)
                         const color = RANK_COLORS[r.key] || "#a0a0a0";
                         return (
                             <div key={r.key} style={{
-                                display: "grid", gridTemplateColumns: "60px 1fr 1fr 90px",
+                                display: "grid", gridTemplateColumns: "60px 1fr 1fr 90px 30px",
                                 gap: 8, alignItems: "center",
                                 padding: "10px 12px",
                                 borderRadius: 10,
@@ -140,13 +140,45 @@ export default function RankCustomizerModal({ isOpen, onClose, onSaved }: Props)
                                         outline: "none", width: "100%",
                                     }}
                                 />
+
+                                {/* Delete btn */}
+                                <button
+                                    onClick={() => setConfigs(prev => prev.filter(c => c.key !== r.key))}
+                                    disabled={configs.length <= 1}
+                                    style={{
+                                        background: "none", border: "none",
+                                        color: configs.length <= 1 ? "#444" : "#ff4444",
+                                        cursor: configs.length <= 1 ? "not-allowed" : "pointer",
+                                        padding: 4, display: "flex", alignItems: "center", justifyContent: "center"
+                                    }}
+                                >
+                                    <Trash2 size={16} />
+                                </button>
                             </div>
                         );
                     })}
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                    <button
+                        onClick={() => {
+                            const newKey = `N${Math.floor(Math.random() * 1000)}`;
+                            setConfigs(prev => [...prev, { key: newKey, label: "X", name: "New Rank", xp: 10 }]);
+                        }}
+                        style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)",
+                            borderRadius: 8, color: "#60a5fa", padding: "6px 12px",
+                            cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
+                        }}
+                    >
+                        <Plus size={14} /> Add Rank
+                    </button>
+                    <div style={{ flex: 1 }} />
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16 }}>
                     <button
                         onClick={handleReset}
                         style={{
