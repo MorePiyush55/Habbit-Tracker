@@ -9,7 +9,6 @@ import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
-import DailyStrategyPanel from "@/components/system/DailyStrategyPanel";
 import HabitHeatmap from "@/components/game/HabitHeatmap";
 import AchievementBadges from "@/components/game/AchievementBadges";
 import AppNav from "@/components/AppNav";
@@ -181,11 +180,8 @@ export default function Dashboard() {
                         currentStreak={userStats.currentStreak}
                     />
 
-                    {/* 2. Daily Strategy — MIDDLE */}
-                    <DailyStrategyPanel />
-
                     {/* Phase 4: Habit Heatmap */}
-                    <div style={{ marginBottom: "1rem" }}>
+                    <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
                         <HabitHeatmap data={statsData?.heatmapData || []} />
                     </div>
                 </div>
