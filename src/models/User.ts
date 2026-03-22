@@ -53,6 +53,17 @@ const UserSchema = new Schema(
         // Phase 13 — Streak Locking (delete-proof)
         streakSecuredDate: { type: String, default: "" }, // "YYYY-MM-DD"
 
+        // Phase 13.3 — Daily Snapshot Freeze
+        dailySnapshotLocked: { type: Boolean, default: false },
+        dailySnapshotDate:   { type: String,  default: "" },  // "YYYY-MM-DD"
+
+        // Phase 13.3 — XP Cap (anti-inflation)
+        dailyXP:     { type: Number, default: 0 },   // XP earned today
+        dailyXPDate: { type: String, default: "" },  // resets each day
+
+        // Phase 13.3 — Fail Feedback (shown once per day reset)
+        failFeedbackShownDate: { type: String, default: "" }, // "YYYY-MM-DD"
+
         // Phase 13 — Recovery Token (anti-exploit hardened)
         recoveryToken: {
             count:          { type: Number, default: 1 },

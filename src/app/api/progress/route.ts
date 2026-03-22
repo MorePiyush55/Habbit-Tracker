@@ -4,6 +4,8 @@ import { seedDefaultTasks } from "@/services/habitService";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import { toggleProgressSchema } from "@/lib/validation";
 import Habit from "@/models/Habit";
+import ProgressEntry from "@/models/ProgressEntry";
+import User from "@/models/User";
 import connectDB from "@/lib/mongodb";
 
 export async function GET(req: Request) {
@@ -23,7 +25,27 @@ export async function GET(req: Request) {
         const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
         const progress = await getTodayProgress(userId, date);
-        return Response.json(progress);
+
+        // Phase 13.3 — Fail Feedback System
+        let failFeedback = false;
+        const user = await User.findById(userId);
+        if (user && user.failFeedbackShownDate !== date) {
+            const yesterdayDate = new Date(new Date(date).getTime() - 86400000).toISOString().split("T")[0];
+            const yesterdayCompleted = await ProgressEntry.countDocuments({
+                userId,
+                date: yesterdayDate,
+                completed: true
+            });
+            // If they did > 0 but < 3 tasks yesterday, they failed to secure the streak
+            const yesterdayTotal = await ProgressEntry.countDocuments({ userId, date: yesterdayDate });
+            if (yesterdayTotal > 0 && yesterdayCompleted < 3) {
+                failFeedback = true;
+                user.failFeedbackShownDate = date;
+                await user.save();
+            }
+        }
+
+        return Response.json({ ...progress, failFeedback });
     } catch (error) {
         return handleError(error);
     }
@@ -35,6 +57,19 @@ export async function POST(req: Request) {
         if (!userId) return unauthorized();
 
         const body = await req.json();
+
+        // Handle streak securing and snapshot freezing
+        if (body.secureStreak) {
+            const user = await User.findById(userId);
+            if (user && user.streakSecuredDate !== body.date) {
+                user.streakSecuredDate = body.date;
+                user.dailySnapshotLocked = true;
+                user.dailySnapshotDate = body.date;
+                await user.save();
+            }
+            return Response.json({ success: true, locked: true });
+        }
+
         const parsed = toggleProgressSchema.safeParse(body);
         if (!parsed.success) {
             return badRequest(parsed.error.issues[0].message);

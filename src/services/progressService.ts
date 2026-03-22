@@ -131,6 +131,11 @@ export async function toggleSubtaskProgress(
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
+    // Phase 13.3 — Daily Snapshot Freeze
+    if (!completed && user.dailySnapshotLocked && user.dailySnapshotDate === date) {
+        throw new Error("SNAPSHOT_LOCKED: Your stats for today are frozen because the daily minimum was secured.");
+    }
+
     let isWeakestStat = false;
     if (user.stats && habit.primaryStat) {
         const statsObj = user.stats as Record<string, { value: number; xp: number }>;

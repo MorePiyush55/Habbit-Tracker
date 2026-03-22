@@ -9,6 +9,7 @@ import EditQuestModal from "@/components/game/EditQuestModal";
 import CelebrationOverlay from "@/components/game/CelebrationOverlay";
 import QuickAddTask from "@/components/game/QuickAddTask";
 import SessionTimer from "@/components/game/SessionTimer";
+import NextBestAction from "@/components/game/NextBestAction";
 import AppNav from "@/components/AppNav";
 import { ListChecks, ChevronDown, Shield, AlertTriangle } from "lucide-react";
 import { getRankConfigs } from "@/lib/rankConfig";
@@ -24,6 +25,7 @@ export default function TasksPage() {
     const [showCelebration, setShowCelebration] = useState(false);
     const [focusMode, setFocusMode] = useState(true);   // Today Focus Mode
     const [streakSecured, setStreakSecured] = useState(false);
+    const [failFeedback, setFailFeedback] = useState(false);
 
     // Combo XP state (in-memory, resets on refresh by design)
     const [combo, setCombo] = useState(0);
@@ -45,6 +47,8 @@ export default function TasksPage() {
                 setQuests(data.habits || []);
                 // Check if streak already secured today
                 if (data.streakSecuredDate === today) setStreakSecured(true);
+                // Fail feedback check
+                if (data.failFeedback) setFailFeedback(true);
             }
         } catch (err) {
             console.error("Failed to fetch quests:", err);
@@ -272,6 +276,43 @@ export default function TasksPage() {
                           </>
                     }
                 </div>
+
+                {/* Fail Feedback UI */}
+                {failFeedback && (
+                    <div style={{
+                        background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.5)",
+                        borderRadius: 12, padding: "16px 20px", marginBottom: 20, textAlign: "center",
+                        boxShadow: "0 0 20px rgba(239,68,68,0.15)"
+                    }}>
+                        <div style={{ color: "#ff4466", fontWeight: 700, fontSize: "1.1rem", marginBottom: 8, fontFamily: "monospace", letterSpacing: 1 }}>
+                            ⚠️ SYSTEM WARNING
+                        </div>
+                        <div style={{ color: "var(--text-primary)", fontSize: "0.9rem" }}>
+                            You failed to meet the daily minimum requirements yesterday.<br/>
+                            <span style={{ color: "#ff4466", fontWeight: 600 }}>Your streak has been reset to 0.</span>
+                        </div>
+                        <button 
+                            onClick={() => setFailFeedback(false)}
+                            style={{ 
+                                marginTop: 12, padding: "6px 16px", background: "rgba(239,68,68,0.2)",
+                                border: "1px solid rgba(239,68,68,0.5)", borderRadius: 8, color: "#ff4466", 
+                                cursor: "pointer", fontFamily: "monospace", transition: "all 0.2s" 
+                            }}>
+                            Acknowledge
+                        </button>
+                    </div>
+                )}
+
+                {/* Next Best Action */}
+                <NextBestAction 
+                    quest={sortedQuests.find(q => !q.isFullyCompleted) || null} 
+                    onComplete={(id) => {
+                        const quest = sortedQuests.find(q => q._id === id || q.subtasks?.some(s => s._id === id));
+                        if (!quest) return;
+                        if (quest._id === id) handleToggleMainTask(id, true);
+                        else handleToggleSubtask(quest._id, id, true);
+                    }} 
+                />
 
                 {/* Header */}
                 <div className="tasks-header glass-card">

@@ -24,6 +24,21 @@ export async function POST(req: Request) {
         const user = await User.findById(userId);
         if (!user) return unauthorized();
 
+        const now = new Date();
+        const today = now.toISOString().split("T")[0];
+
+        // Reset daily XP if it's a new day
+        if (user.dailyXPDate !== today) {
+            user.dailyXPDate = today;
+            user.dailyXP = 0;
+        }
+
+        // Apply XP Soft Cap
+        let adjustedAmount = amount;
+        if (user.dailyXP >= 200) {
+            adjustedAmount = Math.ceil(amount * 0.5); // 50% reduction when over 200 XP
+        }
+
         // Server-side combo validation
         if (comboCount !== undefined && timestamp) {
             const clientTime = new Date(timestamp);
@@ -43,7 +58,8 @@ export async function POST(req: Request) {
             user.lastTaskCompletedAt = clientTime;
         }
 
-        user.totalXP = (user.totalXP || 0) + amount;
+        user.totalXP = (user.totalXP || 0) + adjustedAmount;
+        user.dailyXP = (user.dailyXP || 0) + adjustedAmount;
         await user.save();
 
         return Response.json({
