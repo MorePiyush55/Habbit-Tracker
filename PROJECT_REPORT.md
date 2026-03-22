@@ -134,8 +134,11 @@ solo-leveling-tracker/
 | **RankCustomizerModal.tsx** | 11.4KB | Configure custom name/label/XP for each rank tier. Saves to MongoDB (persistent across all devices). |
 | **CelebrationOverlay.tsx** | 11KB | Full-screen celebration when all daily quests are completed. Canvas-based particle confetti, trophy animation, XP summary, fade-exit. |
 | **PlayerStats.tsx** | 9.1KB | Sidebar player card: level, XP, streak, HP bar, gold, 6 core stats (STR/VIT/INT/AGI/PER/CHA), hunter rank badge. |
-| **BossBattle.tsx** | 4.9KB | Weekly Boss Raid widget. Tracks boss HP (500), progress bar, displays defeat status, resets weekly. |
-| **HabitHeatmap.tsx** | 3.1KB | GitHub-style contribution heatmap showing habit completion history. |
+| **BossBattle.tsx** | 8.5KB | Weekly Boss Raid widget with 3 dynamic phases (Awakening / Enraged / Rage Mode). Modifies colors based on HP thresholds. |
+| **SessionTimer.tsx** | 8.7KB | Focus mode timer component. Tracks deep-work sessions and rewards user bonus XP for completing items within the session duration. |
+| **HabitHeatmap.tsx** | 7.4KB | GitHub-style contribution heatmap. Clickable grid opens popovers showing XP earned, completion percentages, and specific tasks done that day. |
+| **QuickAddTask.tsx** | 4.7KB | Inline rapid quest addition. Press enter to instantly create sensible default E-rank quests without opening a bulky modal. |
+| **NextBestAction.tsx** | 3.5KB | Glowing UI element answering the question "What should I do next?". Highlights the highest priority missing task with a 'DO IT' button. |
 | **AchievementBadges.tsx** | 1.7KB | Displays unlocked achievement badges/icons. |
 
 ---
@@ -175,8 +178,8 @@ solo-leveling-tracker/
 | `/api/auth/[...nextauth]` | GET, POST | Google OAuth via NextAuth |
 | `/api/habits` | GET, POST | List all habits; Create new habit |
 | `/api/habits/[id]` | GET, PUT, DELETE | Get/update/delete specific habit |
-| `/api/progress` | GET, POST | Get daily completion status; Toggle subtask/task completion |
-| `/api/analytics` | GET | User stats, XP totals, streaks, heatmap data |
+| `/api/progress` | GET, POST | Get daily completion status; Toggle task completion; Secure daily snapshot freeze |
+| `/api/analytics` | GET | User stats, XP totals, streaks. Click parameters for Daily Map deep-dives |
 | `/api/rank-config` | GET, PUT | Load/save custom rank configurations per user (MongoDB) |
 | `/api/goals` | GET, POST | Manage long-term goals |
 | `/api/hunter-profile` | GET, PUT | Load/save Hunter Profile (deep user context) |
@@ -188,7 +191,10 @@ solo-leveling-tracker/
 | `/api/analyze` | POST | AI behavioral analysis |
 | `/api/system/*` | Various | AI Brain events, chat, state, memory, metrics |
 | `/api/user/stats` | POST | Upgrade character stats (spend stat points) |
-| `/api/cron/system-check` | GET | Scheduled weekly resets, boss raid refresh |
+| `/api/user/add-xp` | POST | Combo XP processing and Daily Limit Soft-cap enforcement |
+| `/api/user/use-recovery`| POST | Executes weekly streak recovery tokens |
+| `/api/user/session` | POST | Start/End and persist Focus Sessions |
+| `/api/cron/system-check`| GET | Scheduled weekly resets, boss raid refresh |
 
 ---
 
@@ -284,8 +290,9 @@ The entire UI is built with **custom Vanilla CSS** (no Tailwind). Located in `sr
 
 ### ⚡ XP & Leveling System
 - Each rank tier awards custom XP (E=10, D=20, C=35, B=55, A=80, S=120 by default)
+- **Combo Bonuses** — Quick task completions trigger +20, +50, or +100 XP Combos with floating toast notifications
+- **XP Soft-Cap** — Earning over 200 XP in a single day enforces a 50% diminished return penalty to balance speedrunning
 - Fully customizable per user via **Rank Customizer** (saved to MongoDB)
-- Completing all subtasks of a quest awards full XP
 - Leveling formula: XP thresholds increase progressively per level
 
 ### 🗡️ RPG Character System
@@ -294,17 +301,23 @@ The entire UI is built with **custom Vanilla CSS** (no Tailwind). Located in `sr
 - **Job Class Evolution** — career title evolves based on stat distribution
 - **Hunter Rank** — weekly evaluated rank (E-Class → S-Class)
 - **HP System** — HP depletes on missed daily quests
+- **Fail Feedback** — Stark, modal rejection message blocks task board if you failed minimums yesterday
 
 ### 🏰 Weekly Boss Raid
 - Weekly boss with 500 HP
-- HP damage dealt by completing subtasks
+- **Phase Mode** — Visual styling modifications at 50% HP (Enraged) and 20% HP (Rage Mode)
+- **Atomic Victory** — Immediate 300 XP and 100 Gold payout alongside +50 HP restoration when the final blow connects
 - Boss resets every Monday
-- Visual progress bar and defeat state
 
-### 🔥 Streaks
+### 🔥 Streaks & Punishments
 - Daily streak counter (consecutive days with all tasks complete)
-- Longest streak record
-- Streak resets if daily tasks missed
+- **Daily Minimum** — Completing 3 focus tasks secures the streak and locks/freezes the snapshot to prevent exploitation
+- **Recovery Tokens** — Users receive 1 Token per week to retrospectively save a lost streak for "yesterday"
+- Streak resets entirely on failure, combined with harsh visual feedback
+
+### 🎯 Next Best Action
+- Intelligent decision-fatigue reducing component highlighted prominently on the top of the hub
+- Automatically filters and extracts the highest impact unfinished quest (High priority + High Base XP reward)
 
 ### 🎊 Celebration System
 - Full-screen particle celebration fires when all daily quests are completed
@@ -315,6 +328,7 @@ The entire UI is built with **custom Vanilla CSS** (no Tailwind). Located in `sr
 - XP earned per day
 - Completion rate statistics
 - GitHub-style heatmap visualization of habit history (12-week view)
+- Clickable days display exact XP metrics and missing tasks inside a hover popover
 - Discipline score, focus score, skill growth score
 
 ### 🧠 AI Coaching System
