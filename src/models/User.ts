@@ -48,6 +48,31 @@ const UserSchema = new Schema(
         // Boss Raid variables
         weeklyBossHP: { type: Number, default: 500 },
         bossDefeatedThisWeek: { type: Boolean, default: false },
+        bossRewardClaimedThisWeek: { type: Boolean, default: false },
+
+        // Phase 13 — Streak Locking (delete-proof)
+        streakSecuredDate: { type: String, default: "" }, // "YYYY-MM-DD"
+
+        // Phase 13 — Recovery Token (anti-exploit hardened)
+        recoveryToken: {
+            count:          { type: Number, default: 1 },
+            lastUsedDate:   { type: Date,   default: null },
+            weekRefillKey:  { type: String, default: "" },  // "2026-W12"
+            _id: false,
+        },
+
+        // Phase 13 — Combo XP (server-validated)
+        sessionCombo:         { type: Number, default: 0 },
+        lastTaskCompletedAt:  { type: Date,   default: null },
+
+        // Phase 13 — Session Mode (refresh-safe)
+        session: {
+            active:                      { type: Boolean, default: false },
+            startedAt:                   { type: Date,    default: null  },
+            completedTasksDuringSession: { type: Number,  default: 0    },
+            durationMinutes:             { type: Number,  default: 60   },
+            _id: false,
+        },
 
         // Custom Rank Config (persisted per user)
         rankConfigs: [{

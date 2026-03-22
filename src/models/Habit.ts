@@ -6,8 +6,9 @@ const HabitSchema = new Schema(
         title: { type: String, required: true },
         category: { type: String, required: true },
         // RPG Phase 2 Addition: Quest Rank and Stat Association
-        rank: { type: String, enum: ["E", "D", "C", "B", "A", "S"], required: true, default: "E" },
+        rank: { type: String, required: true, default: "E" },
         primaryStat: { type: String, enum: ["STR", "VIT", "INT", "AGI", "PER", "CHA"], required: true, default: "STR" },
+        priority: { type: String, enum: ["HIGH", "MEDIUM", "LOW"], default: "MEDIUM" },
         
         xpReward: { type: Number, required: true },
         order: { type: Number, default: 0 },
