@@ -47,7 +47,16 @@ const UserSchema = new Schema(
 
         // Boss Raid variables
         weeklyBossHP: { type: Number, default: 500 },
-        bossDefeatedThisWeek: { type: Boolean, default: false }
+        bossDefeatedThisWeek: { type: Boolean, default: false },
+
+        // Custom Rank Config (persisted per user)
+        rankConfigs: [{
+            key:   { type: String },
+            label: { type: String },
+            name:  { type: String },
+            xp:    { type: Number },
+            _id:   false,
+        }],
     },
     { timestamps: true }
 );

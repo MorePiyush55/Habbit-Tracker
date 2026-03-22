@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import useSWR from "swr";
 import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar, BookOpen, Shield, Briefcase, TrendingUp, Pen, Settings2 } from "lucide-react";
 import RankCustomizerModal from "@/components/game/RankCustomizerModal";
-import { getRankConfigs, type RankConfig } from "@/lib/rankConfig";
+import { DEFAULT_RANKS, saveRankConfigs, type RankConfig } from "@/lib/rankConfig";
 
 const goalsFetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -34,9 +34,12 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [showRankCustomizer, setShowRankCustomizer] = useState(false);
-    const [rankConfigs, setRankConfigs] = useState<RankConfig[]>(() => getRankConfigs());
 
-    useEffect(() => { setRankConfigs(getRankConfigs()); }, [isOpen]);
+    const rankFetcher = (url: string) => fetch(url).then(r => r.json());
+    const { data: rankData, mutate: mutateRanks } = useSWR("/api/rank-config", rankFetcher);
+    const rankConfigs: RankConfig[] = (rankData?.configs && rankData.configs.length > 0)
+        ? rankData.configs
+        : DEFAULT_RANKS;
 
     // Fetch goals via SWR (only when modal is open)
     const { data: goalsData } = useSWR(isOpen ? "/api/goals" : null, goalsFetcher);
@@ -69,12 +72,15 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
             const todayStr = new Date().toISOString().split("T")[0];
             const effectiveDeadline = scheduleType === "today" ? todayStr : scheduleType === "custom" ? deadline : undefined;
 
+            const selectedRankConfig = rankConfigs.find(r => r.key === rank);
+            const xpReward = selectedRankConfig ? selectedRankConfig.xp : 10;
+
             const payload: Record<string, unknown> = {
                 title,
                 category: finalCategory,
                 rank,
                 primaryStat,
-                xpReward: 10, // Default fallback, but game engine calculates exact amount
+                xpReward,
                 subtasks: validSubtasks,
                 isDaily,
             };
@@ -216,7 +222,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
                         <RankCustomizerModal
                             isOpen={showRankCustomizer}
                             onClose={() => setShowRankCustomizer(false)}
-                            onSaved={() => setRankConfigs(getRankConfigs())}
+                            onSaved={() => mutateRanks()}
                         />
                     )}
 

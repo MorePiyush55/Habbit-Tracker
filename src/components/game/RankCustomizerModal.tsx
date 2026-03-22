@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, RotateCcw, Save, Trash2, Plus } from "lucide-react";
-import { getRankConfigs, saveRankConfigs, DEFAULT_RANKS, type RankConfig } from "@/lib/rankConfig";
+import { DEFAULT_RANKS, saveRankConfigs, type RankConfig } from "@/lib/rankConfig";
 
 const RANK_COLORS: Record<string, string> = {
     S: "#ff0080", A: "#ff8c00", B: "#8b5cf6", C: "#00b4ff", D: "#00ff88", E: "#a0a0a0",
@@ -17,11 +17,24 @@ interface Props {
 export default function RankCustomizerModal({ isOpen, onClose, onSaved }: Props) {
     const [configs, setConfigs] = useState<RankConfig[]>([]);
     const [saved, setSaved] = useState(false);
+    const [loadingConfigs, setLoadingConfigs] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            setConfigs(getRankConfigs().map(r => ({ ...r })));
             setSaved(false);
+            setLoadingConfigs(true);
+            fetch("/api/rank-config")
+                .then(r => r.json())
+                .then(data => {
+                    const fetched: RankConfig[] = Array.isArray(data.configs) && data.configs.length > 0
+                        ? data.configs
+                        : DEFAULT_RANKS;
+                    setConfigs(fetched.map(r => ({ ...r })));
+                    // Also update localStorage cache for offline use
+                    saveRankConfigs(fetched);
+                })
+                .catch(() => setConfigs(DEFAULT_RANKS.map(r => ({ ...r }))))
+                .finally(() => setLoadingConfigs(false));
         }
     }, [isOpen]);
 
@@ -31,7 +44,14 @@ export default function RankCustomizerModal({ isOpen, onClose, onSaved }: Props)
         setConfigs(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        // Save to API (persists in MongoDB)
+        await fetch("/api/rank-config", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ configs }),
+        });
+        // Also update localStorage for immediate local access
         saveRankConfigs(configs);
         setSaved(true);
         setTimeout(() => { onSaved(); onClose(); }, 600);

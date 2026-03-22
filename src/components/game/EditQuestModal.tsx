@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+import useSWR from "swr";
 import { X, Plus, Trash2, RotateCw, CalendarCheck, Calendar, BookOpen, Shield, Briefcase, TrendingUp, Pen, Settings2 } from "lucide-react";
 import type { Quest } from "./QuestPanel";
 import RankCustomizerModal from "@/components/game/RankCustomizerModal";
-import { getRankConfigs, type RankConfig } from "@/lib/rankConfig";
+import { DEFAULT_RANKS, type RankConfig } from "@/lib/rankConfig";
 
 interface EditQuestModalProps {
     quest: Quest;
@@ -43,12 +44,12 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [showRankCustomizer, setShowRankCustomizer] = useState(false);
-    const [rankConfigs, setRankConfigs] = useState<RankConfig[]>(() => getRankConfigs());
 
-    // Sync rank configs whenever the modal opens
-    useEffect(() => {
-        setRankConfigs(getRankConfigs());
-    }, [quest._id]);
+    const rankFetcher = (url: string) => fetch(url).then(r => r.json());
+    const { data: rankData, mutate: mutateRanks } = useSWR("/api/rank-config", rankFetcher);
+    const rankConfigs: RankConfig[] = (rankData?.configs && rankData.configs.length > 0)
+        ? rankData.configs
+        : DEFAULT_RANKS;
 
     const handleAddSubtask = () => {
         setSubtasks(prev => [...prev, {id: subtaskIdRef.current++, text: ""}]);
@@ -75,12 +76,15 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
             const todayStr = new Date().toISOString().split("T")[0];
             const effectiveDeadline = scheduleType === "today" ? todayStr : scheduleType === "custom" ? deadline : null;
 
+            const selectedRankConfig = rankConfigs.find(r => r.key === rank);
+            const xpReward = selectedRankConfig ? selectedRankConfig.xp : 10;
+
             const payload: Record<string, unknown> = {
                 title,
                 category: finalCategory,
                 rank,
                 primaryStat,
-                xpReward: 10,
+                xpReward,
                 subtasks: validSubtasks,
                 isDaily,
                 deadline: effectiveDeadline,
@@ -217,7 +221,7 @@ export default function EditQuestModal({ quest, onClose, onQuestUpdated }: EditQ
                         <RankCustomizerModal
                             isOpen={showRankCustomizer}
                             onClose={() => setShowRankCustomizer(false)}
-                            onSaved={() => setRankConfigs(getRankConfigs())}
+                            onSaved={() => mutateRanks()}
                         />
                     )}
 
