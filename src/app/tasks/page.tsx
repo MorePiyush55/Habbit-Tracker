@@ -6,6 +6,7 @@ import QuestPanel from "@/components/game/QuestPanel";
 import type { Quest } from "@/components/game/QuestPanel";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import EditQuestModal from "@/components/game/EditQuestModal";
+import CelebrationOverlay from "@/components/game/CelebrationOverlay";
 import AppNav from "@/components/AppNav";
 import { ListChecks } from "lucide-react";
 import { getRankConfigs } from "@/lib/rankConfig";
@@ -16,6 +17,8 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
+    const [showCelebration, setShowCelebration] = useState(false);
+    const celebrationShownRef = useRef(false); // prevent double-firing
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingToggles = useRef(0);
 
@@ -181,6 +184,23 @@ export default function TasksPage() {
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
     const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
 
+    // Fire celebration when ALL quests with at least 1 quest are done
+    useEffect(() => {
+        if (
+            quests.length > 0 &&
+            completedCount === quests.length &&
+            !celebrationShownRef.current &&
+            !loading
+        ) {
+            celebrationShownRef.current = true;
+            setShowCelebration(true);
+        }
+        // Reset so next day it fires again
+        if (completedCount < quests.length) {
+            celebrationShownRef.current = false;
+        }
+    }, [completedCount, quests.length, loading]);
+
     if (status === "loading" || loading) {
         return (
             <div className="loading-spinner" style={{ minHeight: "100vh" }}>
@@ -193,6 +213,12 @@ export default function TasksPage() {
 
     return (
         <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
+            <CelebrationOverlay
+                show={showCelebration}
+                totalXP={totalXP}
+                questCount={quests.length}
+                onClose={() => setShowCelebration(false)}
+            />
             <AppNav />
             <div className="tasks-page">
                 {/* Header */}
