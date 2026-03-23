@@ -19,20 +19,28 @@ export async function GET(req: Request) {
 
         // Detail mode: return a single day's data for heatmap click
         if (detail) {
-            const dp = await DailyProgress.findOne({ userId, date: detail }).lean();
+            import ProgressEntry from "@/models/ProgressEntry";
+            
+            const entries = await ProgressEntry.find({ userId, date: detail }).lean();
             const habits = await Habit.find({ userId, isActive: true }).lean();
 
-            const completedIds: string[] = (dp as any)?.completedSubtasks?.map((s: any) => s.habitId?.toString()) || [];
-            const completedHabits = habits.filter(h => completedIds.includes(h._id.toString()));
-            const failedHabits = habits.filter(h => !completedIds.includes(h._id.toString()));
+            const completedIds = new Set(
+                entries.filter((e: any) => e.completed).map((e: any) => e.habitId?.toString())
+            );
+
+            const completedHabits = habits.filter(h => completedIds.has(h._id.toString()));
+            const failedHabits = habits.filter(h => !completedIds.has(h._id.toString()));
             const totalXP = completedHabits.reduce((s, h) => s + (h.xpReward || 0), 0);
+
+            let rate = habits.length > 0 ? Math.round((completedHabits.length / habits.length) * 100) : 0;
+            if (rate > 100) rate = 100;
 
             return Response.json({
                 date: detail,
                 completedTasks: completedHabits.map(h => h.title),
                 failedTasks: failedHabits.map(h => h.title),
                 totalXP,
-                completionRate: habits.length > 0 ? Math.round((completedHabits.length / habits.length) * 100) : 0,
+                completionRate: rate,
             });
         }
 

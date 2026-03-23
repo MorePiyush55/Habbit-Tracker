@@ -50,7 +50,7 @@ export default function Dashboard() {
         { refreshInterval: 30000 }
     );
 
-    const { data: statsData } = useSWR("/api/analytics?days=1", fetcher, { refreshInterval: 30000 });
+    const { data: statsData } = useSWR("/api/analytics?days=120", fetcher, { refreshInterval: 30000 });
 
     const quests: Quest[] = progressData?.habits || [];
     const userStats = {
