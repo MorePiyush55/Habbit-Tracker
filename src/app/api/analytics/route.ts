@@ -5,6 +5,7 @@ import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import Habit from "@/models/Habit";
 import DailyProgress from "@/models/DailyProgress";
+import ProgressEntry from "@/models/ProgressEntry";
 
 export async function GET(req: Request) {
     try {
@@ -19,7 +20,6 @@ export async function GET(req: Request) {
 
         // Detail mode: return a single day's data for heatmap click
         if (detail) {
-            import ProgressEntry from "@/models/ProgressEntry";
             
             const entries = await ProgressEntry.find({ userId, date: detail }).lean();
             const habits = await Habit.find({ userId, isActive: true }).lean();
