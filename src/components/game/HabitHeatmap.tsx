@@ -29,10 +29,12 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         return { startDate: past, endDate: today };
     }, []);
 
-    const validData = (data || []).map(d => ({ 
-        date: d.date.replace(/-/g, '/'), 
-        count: Math.min(10, d.count || 0) 
-    }));
+    const validData = (data || [])
+        .map(d => ({ 
+            date: d.date.replace(/-/g, '/'), 
+            count: Math.min(10, d.count || 0) 
+        }))
+        .filter(d => d.count > 0);
 
     const handleDayClick = async (dateStr: string) => {
         if (!dateStr) return;
