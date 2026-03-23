@@ -20,8 +20,8 @@ export async function GET(req: Request) {
 
         // Detail mode: return a single day's data for heatmap click
         if (detail) {
-            
-            const entries = await ProgressEntry.find({ userId, date: detail }).lean();
+            const dbDate = detail.replace(/\//g, '-');
+            const entries = await ProgressEntry.find({ userId, date: dbDate }).lean();
             const habits = await Habit.find({ userId, isActive: true }).lean();
 
             const completedIds = new Set(
