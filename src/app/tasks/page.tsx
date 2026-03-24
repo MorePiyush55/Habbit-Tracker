@@ -26,6 +26,13 @@ export default function TasksPage() {
     const [focusMode, setFocusMode] = useState(true);   // Today Focus Mode
     const [streakSecured, setStreakSecured] = useState(false);
     const [failFeedback, setFailFeedback] = useState(false);
+    const [yesterdayReview, setYesterdayReview] = useState<{
+        date: string;
+        canLateFix: boolean;
+        unresolvedCount: number;
+        unresolvedHabits: { habitId: string; title: string }[];
+    } | null>(null);
+    const [reviewActionLoading, setReviewActionLoading] = useState(false);
 
     // Combo XP state (in-memory, resets on refresh by design)
     const [combo, setCombo] = useState(0);
@@ -45,6 +52,7 @@ export default function TasksPage() {
             if (res.ok) {
                 const data = await res.json();
                 setQuests(data.habits || []);
+                setYesterdayReview(data.yesterdayReview || null);
                 // Check if streak already secured today
                 if (data.streakSecuredDate === today) setStreakSecured(true);
                 // Fail feedback check
@@ -182,6 +190,42 @@ export default function TasksPage() {
         } catch { await fetchQuests(); }
     };
 
+    const handleLateFix = async () => {
+        if (!yesterdayReview || yesterdayReview.unresolvedHabits.length === 0) return;
+        setReviewActionLoading(true);
+        try {
+            await Promise.all(
+                yesterdayReview.unresolvedHabits.map((habit) =>
+                    fetch("/api/progress/late-complete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            date: today,
+                            habitId: habit.habitId,
+                        }),
+                    })
+                )
+            );
+            await fetchQuests();
+        } finally {
+            setReviewActionLoading(false);
+        }
+    };
+
+    const handleConvertBacklog = async () => {
+        setReviewActionLoading(true);
+        try {
+            await fetch("/api/progress/convert-backlog", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ date: today }),
+            });
+            await fetchQuests();
+        } finally {
+            setReviewActionLoading(false);
+        }
+    };
+
     // Sort: priority HIGH→MEDIUM→LOW, then XP desc, completed last
     const sortedQuests = useMemo(() => {
         const pOrder: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
@@ -196,6 +240,7 @@ export default function TasksPage() {
 
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
     const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
+    const backlogQuests = sortedQuests.filter((q) => q.isBacklog);
 
     // Streak locking: secure once ≥ DAILY_MINIMUM completed (delete-proof)
     useEffect(() => {
@@ -278,6 +323,63 @@ export default function TasksPage() {
                 </div>
 
                 {/* Fail Feedback UI */}
+                {yesterdayReview && yesterdayReview.unresolvedCount > 0 && (
+                    <div style={{
+                        background: "rgba(255,204,0,0.08)",
+                        border: "1px solid rgba(255,204,0,0.35)",
+                        borderRadius: 12,
+                        padding: "14px 18px",
+                        marginBottom: 14,
+                        boxShadow: "0 0 16px rgba(255,204,0,0.12)",
+                    }}>
+                        <div style={{ color: "#ffcc00", fontWeight: 700, fontSize: "0.95rem", marginBottom: 6, fontFamily: "monospace", letterSpacing: 1 }}>
+                            SYSTEM ALERT: YESTERDAY REVIEW
+                        </div>
+                        <div style={{ color: "var(--text-primary)", fontSize: "0.85rem", marginBottom: 10 }}>
+                            {yesterdayReview.unresolvedCount} task(s) from {yesterdayReview.date} were not confirmed.
+                        </div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                            <button
+                                onClick={handleLateFix}
+                                disabled={reviewActionLoading || !yesterdayReview.canLateFix}
+                                style={{
+                                    padding: "7px 14px",
+                                    borderRadius: 8,
+                                    border: "1px solid rgba(255,204,0,0.45)",
+                                    background: "rgba(255,204,0,0.16)",
+                                    color: "#ffcc00",
+                                    fontFamily: "monospace",
+                                    cursor: reviewActionLoading || !yesterdayReview.canLateFix ? "not-allowed" : "pointer",
+                                    opacity: reviewActionLoading || !yesterdayReview.canLateFix ? 0.6 : 1,
+                                }}
+                            >
+                                Fix Now (70% XP)
+                            </button>
+                            <button
+                                onClick={handleConvertBacklog}
+                                disabled={reviewActionLoading}
+                                style={{
+                                    padding: "7px 14px",
+                                    borderRadius: 8,
+                                    border: "1px solid rgba(255,122,122,0.4)",
+                                    background: "rgba(255,68,68,0.14)",
+                                    color: "#ff7a7a",
+                                    fontFamily: "monospace",
+                                    cursor: reviewActionLoading ? "not-allowed" : "pointer",
+                                    opacity: reviewActionLoading ? 0.6 : 1,
+                                }}
+                            >
+                                Carry Forward as Backlog
+                            </button>
+                        </div>
+                        {!yesterdayReview.canLateFix && (
+                            <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: "0.75rem", fontFamily: "monospace" }}>
+                                Late fix window expired. Use backlog recovery before today ends.
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {failFeedback && (
                     <div style={{
                         background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.5)",
@@ -365,6 +467,21 @@ export default function TasksPage() {
                 <QuickAddTask onAdded={fetchQuests} />
 
                 {/* Quest List */}
+                {backlogQuests.length > 0 && (
+                    <div className="glass-card" style={{ padding: "14px 18px", marginBottom: 12 }}>
+                        <div style={{ color: "#ff7a7a", fontWeight: 700, fontFamily: "monospace", fontSize: "0.85rem", marginBottom: 8 }}>
+                            ⚠️ BACKLOG MISSIONS
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            {backlogQuests.map((q) => (
+                                <div key={`backlog-${q._id}`} style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
+                                    • {q.title} {q.sourceDate ? `(${q.sourceDate})` : "(Yesterday)"}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="tasks-content">
                     <QuestPanel
                         quests={displayedQuests}

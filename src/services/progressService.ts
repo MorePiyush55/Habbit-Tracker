@@ -13,12 +13,66 @@ import BehaviorLog from "@/models/BehaviorLog";
 import { Difficulty } from "@/types";
 import { emit, createEvent, SystemEvents } from "@/lib/core/eventBus";
 
+export const DAILY_MINIMUM_REQUIRED = 3;
+export const LATE_WINDOW_HOURS = 8;
+export const LATE_XP_MULTIPLIER = 0.7;
+export const BACKLOG_XP_MULTIPLIER = 0.7;
+export const RECOVERY_XP_MULTIPLIER = 0.5;
+
+export type CompletionType = "normal" | "late" | "backlog" | "recovery";
+
+type ToggleOptions = {
+    completionType?: CompletionType;
+    xpMultiplier?: number;
+    sourceDate?: string | null;
+};
+
+function getDateOnlyString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function parseDateOnly(value: string): Date {
+    return new Date(`${value}T00:00:00`);
+}
+
+function getYesterday(date: string): string {
+    const base = parseDateOnly(date);
+    base.setDate(base.getDate() - 1);
+    return getDateOnlyString(base);
+}
+
+function getLateWindowDeadline(todayDate: string): Date {
+    const start = parseDateOnly(todayDate);
+    start.setHours(LATE_WINDOW_HOURS, 0, 0, 0);
+    return start;
+}
+
+function isBeforeOrAt(date: Date, deadline: Date): boolean {
+    return date.getTime() <= deadline.getTime();
+}
+
+function normalizeId(value: { toString(): string } | string | undefined): string {
+    if (!value) return "";
+    return typeof value === "string" ? value : value.toString();
+}
+
 export async function getTodayProgress(userId: string, date: string) {
     await connectDB();
 
     let dailyProgress = await DailyProgress.findOne({ userId, date }).lean();
     if (!dailyProgress) {
-        dailyProgress = await DailyProgress.create({ userId, date, totalXP: 0, completionRate: 0, bossDefeated: false });
+        dailyProgress = await DailyProgress.create({
+            userId,
+            date,
+            totalXP: 0,
+            completionRate: 0,
+            bossDefeated: false,
+            isLocked: false,
+            lateEditAllowedUntil: getLateWindowDeadline(date),
+        });
         dailyProgress = dailyProgress.toObject();
     }
 
@@ -39,6 +93,7 @@ export async function getTodayProgress(userId: string, date: string) {
                 (e) => e.habitId?.toString() === habit._id.toString() && !e.subtaskId
             );
             const isCompleted = mainEntry?.completed || false;
+            const isBacklog = Boolean(mainEntry?.sourceDate) && mainEntry?.completionType === "backlog";
             return {
                 _id: habit._id.toString(),
                 title: habit.title,
@@ -52,6 +107,9 @@ export async function getTodayProgress(userId: string, date: string) {
                 subtasks: [],
                 completionPercent: isCompleted ? 100 : 0,
                 isFullyCompleted: isCompleted,
+                completionType: mainEntry?.completionType || "normal",
+                sourceDate: mainEntry?.sourceDate || null,
+                isBacklog,
             };
         }
 
@@ -65,6 +123,8 @@ export async function getTodayProgress(userId: string, date: string) {
                 order: sub.order,
                 completed: entry?.completed || false,
                 xpEarned: entry?.xpEarned || 0,
+                completionType: (entry?.completionType as CompletionType | undefined) || "normal",
+                sourceDate: entry?.sourceDate || null,
             };
         });
 
@@ -72,6 +132,9 @@ export async function getTodayProgress(userId: string, date: string) {
         const totalCount = subtasksWithProgress.length;
         const completionPercent = Math.round((completedCount / totalCount) * 100);
         const isFullyCompleted = completionPercent === 100;
+        const hasBacklogSubtask = subtasksWithProgress.some(
+            (s) => s.completionType === "backlog" && Boolean(s.sourceDate)
+        );
 
         return {
             _id: habit._id.toString(),
@@ -86,6 +149,9 @@ export async function getTodayProgress(userId: string, date: string) {
             subtasks: subtasksWithProgress,
             completionPercent,
             isFullyCompleted,
+            completionType: hasBacklogSubtask ? "backlog" : "normal",
+            sourceDate: hasBacklogSubtask ? subtasksWithProgress.find((s) => s.sourceDate)?.sourceDate || null : null,
+            isBacklog: hasBacklogSubtask,
         };
     });
 
@@ -98,19 +164,203 @@ export async function getTodayProgress(userId: string, date: string) {
     };
 }
 
+export async function getYesterdayReview(userId: string, todayDate: string, now: Date = new Date()) {
+    await connectDB();
+
+    const yesterdayDate = getYesterday(todayDate);
+    const lateDeadline = getLateWindowDeadline(todayDate);
+    const canLateFix = isBeforeOrAt(now, lateDeadline);
+
+    const habits = await Habit.find({ userId, isActive: true, isDaily: true })
+        .select({ _id: 1, title: 1 })
+        .lean<Array<{ _id: { toString(): string }; title: string }>>();
+
+    const entries = await ProgressEntry.find({ userId, date: yesterdayDate, completed: true })
+        .select({ habitId: 1 })
+        .lean<Array<{ habitId?: { toString(): string } | string }>>();
+
+    const completedHabitIds = new Set(entries.map((entry) => normalizeId(entry.habitId)).filter(Boolean));
+    const unresolvedHabits = habits.filter((habit) => !completedHabitIds.has(habit._id.toString()));
+
+    return {
+        date: yesterdayDate,
+        canLateFix,
+        lateEditAllowedUntil: lateDeadline,
+        unresolvedCount: unresolvedHabits.length,
+        unresolvedHabits: unresolvedHabits.map((habit) => ({
+            habitId: habit._id.toString(),
+            title: habit.title,
+        })),
+    };
+}
+
+async function evaluateAndSecureYesterdayStreak(userId: string, todayDate: string, yesterdayDate: string) {
+    const user = await User.findById(userId);
+    if (!user) return { secured: false };
+
+    const yesterdayCompleted = await ProgressEntry.countDocuments({
+        userId,
+        date: yesterdayDate,
+        completed: true,
+    });
+
+    const backlogPending = await ProgressEntry.countDocuments({
+        userId,
+        date: todayDate,
+        completionType: "backlog",
+        sourceDate: yesterdayDate,
+        completed: false,
+    });
+
+    if (yesterdayCompleted >= DAILY_MINIMUM_REQUIRED && backlogPending === 0) {
+        if (user.streakSecuredDate !== yesterdayDate) {
+            user.streakSecuredDate = yesterdayDate;
+        }
+
+        if (user.lastCompletedDate !== yesterdayDate) {
+            const { newStreak } = calculateStreak(user.lastCompletedDate, yesterdayDate, user.currentStreak);
+            user.currentStreak = newStreak;
+            user.longestStreak = Math.max(user.longestStreak, newStreak);
+            user.lastCompletedDate = yesterdayDate;
+        }
+
+        await user.save();
+        return { secured: true, currentStreak: user.currentStreak };
+    }
+
+    return { secured: false, currentStreak: user.currentStreak };
+}
+
+export async function lateCompleteYesterdayTask(
+    userId: string,
+    todayDate: string,
+    habitId: string,
+    subtaskId?: string | null,
+    now: Date = new Date()
+) {
+    const review = await getYesterdayReview(userId, todayDate, now);
+    if (!review.canLateFix) {
+        throw new Error("LATE_WINDOW_EXPIRED: Late completion window is closed for yesterday.");
+    }
+
+    const yesterdayDate = review.date;
+    const result = await toggleSubtaskProgress(
+        userId,
+        yesterdayDate,
+        habitId,
+        subtaskId || null,
+        true,
+        {
+            completionType: "late",
+            xpMultiplier: LATE_XP_MULTIPLIER,
+            sourceDate: yesterdayDate,
+        }
+    );
+
+    const streakStatus = await evaluateAndSecureYesterdayStreak(userId, todayDate, yesterdayDate);
+    return {
+        ...result,
+        appliedMultiplier: LATE_XP_MULTIPLIER,
+        streakSecured: streakStatus.secured,
+        currentStreak: streakStatus.currentStreak,
+        date: yesterdayDate,
+    };
+}
+
+export async function convertYesterdayMissesToBacklog(userId: string, todayDate: string) {
+    await connectDB();
+    const yesterdayDate = getYesterday(todayDate);
+    const review = await getYesterdayReview(userId, todayDate);
+
+    if (review.unresolvedCount === 0) {
+        return { converted: 0, backlogDate: todayDate, sourceDate: yesterdayDate };
+    }
+
+    let todayProgress = await DailyProgress.findOne({ userId, date: todayDate });
+    if (!todayProgress) {
+        todayProgress = await DailyProgress.create({
+            userId,
+            date: todayDate,
+            totalXP: 0,
+            completionRate: 0,
+            bossDefeated: false,
+            isLocked: false,
+        });
+    }
+
+    let converted = 0;
+    for (const unresolved of review.unresolvedHabits) {
+        const habitId = unresolved.habitId;
+        const subtasks = await Subtask.find({ habitId }).select({ _id: 1 }).lean<Array<{ _id: { toString(): string } }>>();
+
+        if (subtasks.length === 0) {
+            const existing = await ProgressEntry.findOne({ userId, date: todayDate, habitId, subtaskId: null });
+            if (!existing) {
+                await ProgressEntry.create({
+                    dailyProgressId: todayProgress._id,
+                    userId,
+                    date: todayDate,
+                    habitId,
+                    subtaskId: null,
+                    completed: false,
+                    xpEarned: 0,
+                    completionType: "backlog",
+                    sourceDate: yesterdayDate,
+                });
+                converted += 1;
+            }
+            continue;
+        }
+
+        for (const subtask of subtasks) {
+            const existing = await ProgressEntry.findOne({
+                userId,
+                date: todayDate,
+                habitId,
+                subtaskId: subtask._id,
+            });
+            if (!existing) {
+                await ProgressEntry.create({
+                    dailyProgressId: todayProgress._id,
+                    userId,
+                    date: todayDate,
+                    habitId,
+                    subtaskId: subtask._id,
+                    completed: false,
+                    xpEarned: 0,
+                    completionType: "backlog",
+                    sourceDate: yesterdayDate,
+                });
+                converted += 1;
+            }
+        }
+    }
+
+    return { converted, backlogDate: todayDate, sourceDate: yesterdayDate };
+}
+
 export async function toggleSubtaskProgress(
     userId: string,
     date: string,
     habitId: string,
     subtaskId: string | null,
-    completed: boolean
+    completed: boolean,
+    options: ToggleOptions = {}
 ) {
     await connectDB();
 
     // Ensure daily progress exists
     let dailyProgress = await DailyProgress.findOne({ userId, date });
     if (!dailyProgress) {
-        dailyProgress = await DailyProgress.create({ userId, date, totalXP: 0, completionRate: 0, bossDefeated: false });
+        dailyProgress = await DailyProgress.create({
+            userId,
+            date,
+            totalXP: 0,
+            completionRate: 0,
+            bossDefeated: false,
+            isLocked: false,
+            lateEditAllowedUntil: getLateWindowDeadline(date),
+        });
     }
 
     // Get habit info for XP
@@ -153,8 +403,13 @@ export async function toggleSubtaskProgress(
         isWeakestStat
     );
 
+    const multiplier = options.xpMultiplier ?? 1;
+    const completionType = options.completionType;
+    const sourceDateProvided = options.sourceDate !== undefined;
+
     const subtaskCount = await Subtask.countDocuments({ habitId });
-    const xpPerSubtask = subtaskCount > 0 ? Math.floor(calculatedXP / subtaskCount) : calculatedXP;
+    const xpPerSubtaskBase = subtaskCount > 0 ? Math.floor(calculatedXP / subtaskCount) : calculatedXP;
+    const xpPerSubtask = Math.floor(xpPerSubtaskBase * multiplier);
     const goldPerSubtask = subtaskCount > 0 ? Math.floor(totalGold / subtaskCount) : totalGold;
     const statXpPerSubtask = subtaskCount > 0 ? Math.floor(statXPGained / subtaskCount) : statXPGained;
 
@@ -172,12 +427,21 @@ export async function toggleSubtaskProgress(
     let xpDelta = 0;
     let goldDelta = 0;
     let statXpDelta = 0;
+    let backlogSourceForStreak: string | null = null;
 
     if (existingEntry) {
         const wasCompleted = existingEntry.completed;
         existingEntry.completed = completed;
         existingEntry.xpEarned = completed ? xpPerSubtask : 0;
+        existingEntry.completionType = completionType || existingEntry.completionType || "normal";
+        if (sourceDateProvided) {
+            existingEntry.sourceDate = options.sourceDate;
+        }
         await existingEntry.save();
+
+        if (completed && existingEntry.completionType === "backlog" && existingEntry.sourceDate) {
+            backlogSourceForStreak = String(existingEntry.sourceDate);
+        }
 
         if (completed && !wasCompleted) {
             xpDelta = xpPerSubtask;
@@ -197,6 +461,8 @@ export async function toggleSubtaskProgress(
             subtaskId: subtaskId || undefined,
             completed,
             xpEarned: completed ? xpPerSubtask : 0,
+            completionType: completionType || "normal",
+            sourceDate: sourceDateProvided ? options.sourceDate : null,
         });
         if (completed) {
             xpDelta = xpPerSubtask;
@@ -279,6 +545,10 @@ export async function toggleSubtaskProgress(
     dailyProgress.completionRate = completionRate;
     dailyProgress.bossDefeated = bossDefeated;
     await dailyProgress.save();
+
+    if (backlogSourceForStreak) {
+        await evaluateAndSecureYesterdayStreak(userId, date, backlogSourceForStreak);
+    }
 
     // Update streak if boss defeated
     if (bossDefeated) {

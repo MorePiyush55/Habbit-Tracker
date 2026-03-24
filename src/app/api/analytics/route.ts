@@ -4,8 +4,62 @@ import { handleError, unauthorized } from "@/lib/apiError";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import Habit from "@/models/Habit";
-import DailyProgress from "@/models/DailyProgress";
 import ProgressEntry from "@/models/ProgressEntry";
+
+type ProgressEntryDoc = {
+    date: string;
+    habitId?: { toString(): string } | string;
+    completed?: boolean;
+    xpEarned?: number;
+};
+
+type DaySummary = {
+    completionRate: number;
+    totalXP: number;
+    completedTasks: string[];
+    failedTasks: string[];
+    count: number;
+};
+
+function normalizeId(value: { toString(): string } | string | undefined): string {
+    if (!value) return "";
+    return typeof value === "string" ? value : value.toString();
+}
+
+function summarizeDay(entries: ProgressEntryDoc[], habitTitleById: Record<string, string>): DaySummary {
+    const completedEntries = entries.filter((entry) => Boolean(entry.completed));
+    const failedEntries = entries.filter((entry) => entry.completed === false);
+
+    const completedTaskSet = new Set(
+        completedEntries.map((entry) => {
+            const habitId = normalizeId(entry.habitId);
+            return habitTitleById[habitId] || "Deleted task";
+        })
+    );
+
+    const failedTaskSet = new Set(
+        failedEntries.map((entry) => {
+            const habitId = normalizeId(entry.habitId);
+            return habitTitleById[habitId] || "Deleted task";
+        })
+    );
+
+    const totalEntries = completedEntries.length + failedEntries.length;
+    const completionRate = totalEntries > 0
+        ? Math.round((completedEntries.length / totalEntries) * 100)
+        : 0;
+
+    const totalXP = completedEntries.reduce((sum, entry) => sum + (entry.xpEarned || 0), 0);
+    const count = Math.round(completionRate / 10);
+
+    return {
+        completionRate,
+        totalXP,
+        completedTasks: Array.from(completedTaskSet),
+        failedTasks: Array.from(failedTaskSet),
+        count,
+    };
+}
 
 export async function GET(req: Request) {
     try {
@@ -22,35 +76,80 @@ export async function GET(req: Request) {
         if (detail) {
             const [y, m, d] = detail.split('/');
             const dbDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            const entries = await ProgressEntry.find({ userId, date: dbDate }).lean();
-            const habits = await Habit.find({ userId, isActive: true }).lean();
+            const entries = await ProgressEntry.find({ userId, date: dbDate })
+                .select({ habitId: 1, completed: 1, xpEarned: 1, date: 1 })
+                .lean<ProgressEntryDoc[]>();
 
-            const completedIds = new Set(
-                entries.filter((e: any) => e.completed).map((e: any) => e.habitId?.toString())
+            const habitIds = Array.from(
+                new Set(
+                    entries
+                        .map((entry) => normalizeId(entry.habitId))
+                        .filter(Boolean)
+                )
             );
 
-            const completedHabits = habits.filter(h => completedIds.has(h._id.toString()));
-            const failedHabits = habits.filter(h => !completedIds.has(h._id.toString()));
-            const totalXP = completedHabits.reduce((s, h) => s + (h.xpReward || 0), 0);
+            const habits = habitIds.length > 0
+                ? await Habit.find({ _id: { $in: habitIds }, userId })
+                    .select({ _id: 1, title: 1 })
+                    .lean<Array<{ _id: { toString(): string }; title: string }>>()
+                : [];
 
-            let rate = habits.length > 0 ? Math.round((completedHabits.length / habits.length) * 100) : 0;
-            if (rate > 100) rate = 100;
+            const habitTitleById = habits.reduce<Record<string, string>>((acc, habit) => {
+                acc[habit._id.toString()] = habit.title;
+                return acc;
+            }, {});
+
+            const summary = summarizeDay(entries, habitTitleById);
 
             return Response.json({
                 date: detail,
-                completedTasks: completedHabits.map(h => h.title),
-                failedTasks: failedHabits.map(h => h.title),
-                totalXP,
-                completionRate: rate,
+                completedTasks: summary.completedTasks,
+                failedTasks: summary.failedTasks,
+                totalXP: summary.totalXP,
+                completionRate: summary.completionRate,
             });
         }
 
         const user = await User.findById(userId).lean();
         const history = await getProgressHistory(userId, days);
 
+        const historyDates = history.map((day: any) => day.date);
+        const entries = historyDates.length > 0
+            ? await ProgressEntry.find({ userId, date: { $in: historyDates } })
+                .select({ habitId: 1, completed: 1, xpEarned: 1, date: 1 })
+                .lean<ProgressEntryDoc[]>()
+            : [];
+
+        const entriesByDate = entries.reduce<Record<string, ProgressEntryDoc[]>>((acc, entry) => {
+            if (!acc[entry.date]) {
+                acc[entry.date] = [];
+            }
+            acc[entry.date].push(entry);
+            return acc;
+        }, {});
+
+        const habitIds = Array.from(
+            new Set(
+                entries
+                    .map((entry) => normalizeId(entry.habitId))
+                    .filter(Boolean)
+            )
+        );
+
+        const habits = habitIds.length > 0
+            ? await Habit.find({ _id: { $in: habitIds }, userId })
+                .select({ _id: 1, title: 1 })
+                .lean<Array<{ _id: { toString(): string }; title: string }>>()
+            : [];
+
+        const habitTitleById = habits.reduce<Record<string, string>>((acc, habit) => {
+            acc[habit._id.toString()] = habit.title;
+            return acc;
+        }, {});
+
         const heatmapData = history.map((day: any) => ({
             date: day.date,
-            count: Math.round((day.completionRate || 0) / 10)
+            count: summarizeDay(entriesByDate[day.date] || [], habitTitleById).count
         }));
 
         return Response.json({

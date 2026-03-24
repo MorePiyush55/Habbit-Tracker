@@ -8,6 +8,8 @@ const ProgressEntrySchema = new Schema({
     subtaskId: { type: Schema.Types.ObjectId, ref: "Subtask" },
     completed: { type: Boolean, default: false },
     xpEarned: { type: Number, default: 0 },
+    completionType: { type: String, enum: ["normal", "late", "backlog", "recovery"], default: "normal" },
+    sourceDate: { type: String, default: null },
 });
 
 ProgressEntrySchema.index({ userId: 1, date: 1 });

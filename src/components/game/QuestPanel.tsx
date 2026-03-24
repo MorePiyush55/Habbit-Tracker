@@ -9,6 +9,8 @@ interface Subtask {
     order: number;
     completed: boolean;
     xpEarned: number;
+    completionType?: "normal" | "late" | "backlog" | "recovery";
+    sourceDate?: string | null;
 }
 
 export interface Quest {
@@ -23,6 +25,9 @@ export interface Quest {
     isFullyCompleted: boolean;
     isDaily?: boolean;
     deadline?: string;
+    completionType?: "normal" | "late" | "backlog" | "recovery";
+    sourceDate?: string | null;
+    isBacklog?: boolean;
 }
 
 interface QuestPanelProps {
@@ -247,6 +252,32 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                                             <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                                                 {quest.completionPercent}%
                                             </span>
+                                            {quest.completionType === "late" && (
+                                                <span style={{
+                                                    fontSize: "0.63rem",
+                                                    color: "#ffcc00",
+                                                    border: "1px solid rgba(255,204,0,0.45)",
+                                                    background: "rgba(255,204,0,0.12)",
+                                                    padding: "1px 6px",
+                                                    borderRadius: 4,
+                                                    letterSpacing: 1,
+                                                }}>
+                                                    LATE
+                                                </span>
+                                            )}
+                                            {quest.isBacklog && (
+                                                <span style={{
+                                                    fontSize: "0.63rem",
+                                                    color: "#ff7a7a",
+                                                    border: "1px solid rgba(255,122,122,0.45)",
+                                                    background: "rgba(255,68,68,0.14)",
+                                                    padding: "1px 6px",
+                                                    borderRadius: 4,
+                                                    letterSpacing: 1,
+                                                }}>
+                                                    BACKLOG
+                                                </span>
+                                            )}
                                             {quest.isDaily && quest.isFullyCompleted && (
                                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: "0.65rem", color: "var(--accent-green)", background: "rgba(0,255,136,0.08)", padding: "2px 6px", borderRadius: 4 }}>
                                                     <Lock size={10} /> Locked

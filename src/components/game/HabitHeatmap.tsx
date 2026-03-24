@@ -30,10 +30,13 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
     }, []);
 
     const validData = (data || [])
-        .map(d => ({ 
-            date: d.date.replace(/-/g, '/'), 
-            count: Math.min(10, d.count || 0) 
-        }))
+        .map(d => {
+            const [y, m, day] = d.date.split('-');
+            return {
+                date: `${y}/${parseInt(m, 10)}/${parseInt(day, 10)}`, 
+                count: Math.min(10, d.count || 0) 
+            };
+        })
         .filter(d => d.count > 0);
 
     const handleDayClick = async (dateStr: string) => {

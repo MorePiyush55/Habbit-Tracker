@@ -1,11 +1,12 @@
 import { getUserId } from "@/lib/auth";
-import { getTodayProgress, toggleSubtaskProgress } from "@/services/progressService";
+import { getTodayProgress, getYesterdayReview, toggleSubtaskProgress } from "@/services/progressService";
 import { seedDefaultTasks } from "@/services/habitService";
 import { handleError, unauthorized, badRequest } from "@/lib/apiError";
 import { toggleProgressSchema } from "@/lib/validation";
 import Habit from "@/models/Habit";
 import ProgressEntry from "@/models/ProgressEntry";
 import User from "@/models/User";
+import DailyProgress from "@/models/DailyProgress";
 import connectDB from "@/lib/mongodb";
 
 export async function GET(req: Request) {
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
         const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
         const progress = await getTodayProgress(userId, date);
+        const yesterdayReview = await getYesterdayReview(userId, date);
 
         // Phase 13.3 — Fail Feedback System
         let failFeedback = false;
@@ -45,7 +47,7 @@ export async function GET(req: Request) {
             }
         }
 
-        return Response.json({ ...progress, failFeedback });
+        return Response.json({ ...progress, failFeedback, yesterdayReview });
     } catch (error) {
         return handleError(error);
     }
@@ -67,6 +69,11 @@ export async function POST(req: Request) {
                 user.dailySnapshotDate = body.date;
                 await user.save();
             }
+            await DailyProgress.findOneAndUpdate(
+                { userId, date: body.date },
+                { $set: { isLocked: true } },
+                { upsert: false }
+            );
             return Response.json({ success: true, locked: true });
         }
 

@@ -6,6 +6,8 @@ const DailyProgressSchema = new Schema({
     totalXP: { type: Number, default: 0 },
     completionRate: { type: Number, default: 0 }, // 0-100
     bossDefeated: { type: Boolean, default: false },
+    isLocked: { type: Boolean, default: false },
+    lateEditAllowedUntil: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
 });
 

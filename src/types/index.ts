@@ -41,6 +41,8 @@ interface IDailyProgress {
     totalXP: number;
     completionRate: number;
     bossDefeated: boolean;
+    isLocked?: boolean;
+    lateEditAllowedUntil?: Date | null;
     createdAt: Date;
 }
 
@@ -53,6 +55,8 @@ interface IProgressEntry {
     subtaskId?: string;
     completed: boolean;
     xpEarned: number;
+    completionType?: "normal" | "late" | "backlog" | "recovery";
+    sourceDate?: string | null;
 }
 
 interface IAchievement {
