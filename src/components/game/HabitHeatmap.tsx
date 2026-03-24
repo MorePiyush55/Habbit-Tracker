@@ -1,6 +1,5 @@
 "use client";
 
-import HeatMap from "@uiw/react-heat-map";
 import { useMemo, useRef, useState } from "react";
 import { Tooltip } from "react-tooltip";
 import { X } from "lucide-react";
@@ -38,10 +37,16 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         return `${y}/${m}/${day}`;
     };
 
-    const validData = (data || []).map(d => {
-        const [y, m, day] = d.date.split('-');
+    const formatDateKey = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${y}/${m}/${day}`;
+    };
+
+    const validData = (data || []).map((d) => {
+        const [y, m, day] = d.date.split("-");
         return {
-            // Keep zero-value dates too so previous non-zero cells are explicitly reset.
             date: `${y}/${parseInt(m, 10)}/${parseInt(day, 10)}`,
             count: Math.max(0, Math.min(10, d.count || 0))
         };
@@ -55,10 +60,10 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         return map;
     }, [validData]);
 
-    const heatmapKey = useMemo(
-        () => Object.entries(countByDate).sort(([a], [b]) => a.localeCompare(b)).map(([d, c]) => `${d}:${c}`).join("|"),
-        [countByDate]
-    );
+    const heatmapKey = useMemo(() => Object.entries(countByDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([d, c]) => `${d}:${c}`)
+        .join("|"), [countByDate]);
 
     const colorForCount = (count: number) => {
         if (count <= 0) return "rgba(255,255,255,0.05)";
@@ -69,6 +74,41 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         if (count <= 8) return "rgba(0,255,136,0.8)";
         return "#00ff88";
     };
+
+    const weeks = useMemo(() => {
+        const gridStart = new Date(startDate);
+        gridStart.setDate(gridStart.getDate() - gridStart.getDay()); // Sunday start
+
+        const gridEnd = new Date(endDate);
+        gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay())); // Saturday end
+
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const totalDays = Math.round((gridEnd.getTime() - gridStart.getTime()) / msPerDay) + 1;
+        const totalWeeks = Math.ceil(totalDays / 7);
+
+        return Array.from({ length: totalWeeks }, (_, weekIndex) => {
+            const cells = Array.from({ length: 7 }, (_, dayIndex) => {
+                const cellDate = new Date(gridStart);
+                cellDate.setDate(gridStart.getDate() + weekIndex * 7 + dayIndex);
+
+                const inRange = cellDate >= startDate && cellDate <= endDate;
+                if (!inRange) {
+                    return { dateKey: null as string | null, count: 0, monthLabel: "" };
+                }
+
+                const dateKey = formatDateKey(cellDate);
+                const count = countByDate[dateKey] || 0;
+                const monthLabel = cellDate.getDate() === 1
+                    ? cellDate.toLocaleString("en-US", { month: "short" })
+                    : "";
+
+                return { dateKey, count, monthLabel };
+            });
+
+            const headerLabel = cells.find((c) => c.monthLabel)?.monthLabel || "";
+            return { headerLabel, cells };
+        });
+    }, [startDate, endDate, countByDate]);
 
     const handleDayClick = async (dateStr: string) => {
         if (!dateStr) return;
@@ -99,44 +139,50 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
             </h3>
 
             <div style={{ minWidth: "600px", display: "flex", justifyContent: "center" }}>
-                <HeatMap
-                    key={heatmapKey}
-                    value={validData}
-                    startDate={startDate}
-                    endDate={endDate}
-                    width={700}
-                    style={{ color: "#8bacc1", "--theme-val": "transparent" } as React.CSSProperties}
-                    rectSize={12}
-                    space={4}
-                    rectProps={{ rx: 3 }}
-                    panelColors={{
-                        0: "rgba(255,255,255,0.05)",
-                        2: "rgba(0,255,136,0.2)",
-                        4: "rgba(0,255,136,0.4)",
-                        6: "rgba(0,255,136,0.6)",
-                        8: "rgba(0,255,136,0.8)",
-                        10: "#00ff88",
-                    }}
-                    rectRender={(props, rectData) => (
-                        (() => {
-                            const dateKey = normalizeDateKey(rectData.date || "");
-                            const count = countByDate[dateKey] || 0;
-                            return (
-                                <rect
-                                    {...props}
-                                    style={{
-                                        ...(props.style || {}),
-                                        fill: colorForCount(count),
-                                        cursor: "pointer",
-                                    }}
-                                    data-tooltip-id="heatmap-tooltip"
-                                    data-tooltip-content={`${dateKey}: ${count ? (count * 10) + "% completion" : "No activity"}`}
-                                    onClick={() => handleDayClick(dateKey)}
-                                />
-                            );
-                        })()
-                    )}
-                />
+                <div key={heatmapKey} style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "#8bacc1" }}>
+                    <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 4, fontSize: "0.65rem", color: "#5e7b95", textAlign: "right" }}>
+                        <span>Sun</span>
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 4 }}>
+                        {weeks.map((week, wi) => (
+                            <div key={`week-${wi}`} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
+                                <div style={{ height: 14, fontSize: "0.72rem", color: "#5e7b95", width: 14, textAlign: "center" }}>
+                                    {week.headerLabel}
+                                </div>
+                                {week.cells.map((cell, di) => {
+                                    const clickable = Boolean(cell.dateKey);
+                                    return (
+                                        <div
+                                            key={`cell-${wi}-${di}`}
+                                            data-tooltip-id="heatmap-tooltip"
+                                            data-tooltip-content={cell.dateKey
+                                                ? `${cell.dateKey}: ${cell.count ? (cell.count * 10) + "% completion" : "No activity"}`
+                                                : ""
+                                            }
+                                            onClick={() => {
+                                                if (cell.dateKey) handleDayClick(cell.dateKey);
+                                            }}
+                                            style={{
+                                                width: 12,
+                                                height: 12,
+                                                borderRadius: 3,
+                                                background: cell.dateKey ? colorForCount(cell.count) : "transparent",
+                                                cursor: clickable ? "pointer" : "default",
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
             <Tooltip id="heatmap-tooltip" style={{ backgroundColor: "#111", color: "#fff", borderRadius: "4px", border: "1px solid #333" }} />
 
