@@ -111,6 +111,10 @@ export async function GET(req: Request) {
         }
 
         const user = await User.findById(userId).lean();
+        const resolvedTotalXP = Math.max(
+            Number((user as any)?.totalXP || 0),
+            Number((user as any)?.xp || 0)
+        );
         const history = await getProgressHistory(userId, days);
 
         const historyDates = history.map((day: any) => day.date);
@@ -155,7 +159,7 @@ export async function GET(req: Request) {
         return Response.json({
             user: {
                 level: user?.level,
-                totalXP: user?.totalXP,
+                totalXP: resolvedTotalXP,
                 currentStreak: user?.currentStreak,
                 longestStreak: user?.longestStreak,
                 gold: (user as any)?.gold || 0,

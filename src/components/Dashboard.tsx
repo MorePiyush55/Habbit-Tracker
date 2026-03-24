@@ -10,7 +10,6 @@ import BossBattle from "@/components/game/BossBattle";
 import CreateQuestModal from "@/components/game/CreateQuestModal";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import HabitHeatmap from "@/components/game/HabitHeatmap";
-import AchievementBadges from "@/components/game/AchievementBadges";
 import AppNav from "@/components/AppNav";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
@@ -167,8 +166,6 @@ export default function Dashboard() {
                         disciplineScore={userStats.disciplineScore}
                         hunterRank={userStats.hunterRank}
                     />
-
-                    <AchievementBadges unlockedIds={[]} />
                 </div>
 
                 {/* ── MAIN CONTENT ── */}
