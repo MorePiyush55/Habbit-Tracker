@@ -38,6 +38,21 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         };
     });
 
+    const heatmapKey = useMemo(
+        () => validData.map((d) => `${d.date}:${d.count}`).join("|"),
+        [validData]
+    );
+
+    const colorForCount = (count: number) => {
+        if (count <= 0) return "rgba(255,255,255,0.05)";
+        if (count <= 1) return "rgba(0,255,136,0.1)";
+        if (count <= 2) return "rgba(0,255,136,0.2)";
+        if (count <= 4) return "rgba(0,255,136,0.4)";
+        if (count <= 6) return "rgba(0,255,136,0.6)";
+        if (count <= 8) return "rgba(0,255,136,0.8)";
+        return "#00ff88";
+    };
+
     const handleDayClick = async (dateStr: string) => {
         if (!dateStr) return;
         // Cache hit — no fetch
@@ -68,6 +83,7 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
 
             <div style={{ minWidth: "600px", display: "flex", justifyContent: "center" }}>
                 <HeatMap
+                    key={heatmapKey}
                     value={validData}
                     startDate={startDate}
                     endDate={endDate}
@@ -87,6 +103,7 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
                     rectRender={(props, rectData) => (
                         <rect
                             {...props}
+                            fill={colorForCount(rectData.count || 0)}
                             data-tooltip-id="heatmap-tooltip"
                             data-tooltip-content={`${rectData.date || ""}: ${rectData.count ? (rectData.count * 10) + "% completion" : "No activity"}`}
                             style={{ cursor: "pointer" }}
