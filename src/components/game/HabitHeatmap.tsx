@@ -29,15 +29,14 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         return { startDate: past, endDate: today };
     }, []);
 
-    const validData = (data || [])
-        .map(d => {
-            const [y, m, day] = d.date.split('-');
-            return {
-                date: `${y}/${parseInt(m, 10)}/${parseInt(day, 10)}`, 
-                count: Math.min(10, d.count || 0) 
-            };
-        })
-        .filter(d => d.count > 0);
+    const validData = (data || []).map(d => {
+        const [y, m, day] = d.date.split('-');
+        return {
+            // Keep zero-value dates too so previous non-zero cells are explicitly reset.
+            date: `${y}/${parseInt(m, 10)}/${parseInt(day, 10)}`,
+            count: Math.max(0, Math.min(10, d.count || 0))
+        };
+    });
 
     const handleDayClick = async (dateStr: string) => {
         if (!dateStr) return;
