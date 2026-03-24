@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckSquare, Terminal, Shield, LogOut } from "lucide-react";
+import { LayoutDashboard, CheckSquare, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 export default function AppNav() {
@@ -22,10 +22,6 @@ export default function AppNav() {
                 <Link href="/tasks" className={`nav-link ${pathname === "/tasks" ? "active" : ""}`}>
                     <CheckSquare size={16} />
                     Tasks
-                </Link>
-                <Link href="/profile" className={`nav-link ${pathname === "/profile" ? "active" : ""}`}>
-                    <Shield size={16} />
-                    Profile
                 </Link>
             </div>
             <button

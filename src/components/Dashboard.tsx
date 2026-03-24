@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import useSWR from "swr";
-import Link from "next/link";
 import PlayerStats from "@/components/game/PlayerStats";
 import QuestPanel from "@/components/game/QuestPanel";
 import BossBattle from "@/components/game/BossBattle";
@@ -33,6 +32,9 @@ interface Quest {
     isFullyCompleted: boolean;
     isDaily?: boolean;
     deadline?: string;
+    isBacklog?: boolean;
+    completionType?: "normal" | "late" | "backlog" | "recovery";
+    sourceDate?: string | null;
 }
 
 export default function Dashboard() {
@@ -126,13 +128,42 @@ export default function Dashboard() {
         setToggling(false);
     };
 
-    // Build boss entries from quests
-    const bossEntries = quests.flatMap((q) =>
-        q.subtasks.map((s) => ({
-            xpEarned: s.xpEarned || (q.xpReward / (q.subtasks.length || 1)),
-            completed: s.completed,
-        }))
-    );
+    const handleToggleMainTask = async (habitId: string, completed: boolean) => {
+        setToggling(true);
+
+        const optimisticData = {
+            ...progressData,
+            habits: quests.map((q) => q._id === habitId
+                ? { ...q, completionPercent: completed ? 100 : 0, isFullyCompleted: completed }
+                : q),
+        };
+        mutateProgress(optimisticData, false);
+
+        try {
+            await fetch("/api/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ habitId, subtaskId: "", completed, date: today }),
+            });
+            mutateProgress();
+        } catch (error) {
+            console.error("Failed to toggle main task:", error);
+            mutateProgress();
+        }
+        setToggling(false);
+    };
+
+    const sortedQuests = [...quests].sort((a, b) => {
+        if (Boolean(a.isBacklog) !== Boolean(b.isBacklog)) {
+            return a.isBacklog ? -1 : 1;
+        }
+        if (a.isFullyCompleted !== b.isFullyCompleted) {
+            return a.isFullyCompleted ? 1 : -1;
+        }
+        return (b.xpReward || 0) - (a.xpReward || 0);
+    });
+
+    const backlogCount = sortedQuests.filter((q) => q.isBacklog && !q.isFullyCompleted).length;
 
     const user = session?.user;
 
@@ -180,6 +211,39 @@ export default function Dashboard() {
                     {/* Phase 4: Habit Heatmap */}
                     <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
                         <HabitHeatmap data={statsData?.heatmapData || []} />
+                    </div>
+
+                    {/* Task board below heatmap */}
+                    <div className="glass-card" style={{ padding: "var(--space-lg)", marginBottom: "1rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                            <div className="section-title" style={{ margin: 0 }}>Task Board</div>
+                            <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                                + Add Task
+                            </button>
+                        </div>
+
+                        {backlogCount > 0 && (
+                            <div style={{
+                                marginBottom: "12px",
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid rgba(255,122,122,0.45)",
+                                background: "rgba(255,68,68,0.12)",
+                                color: "#ff9ca8",
+                                fontSize: "0.8rem",
+                                fontFamily: "monospace",
+                            }}>
+                                {backlogCount} backlog task(s) pending. Backlog is prioritized at the top.
+                            </div>
+                        )}
+
+                        <QuestPanel
+                            quests={sortedQuests}
+                            date={today}
+                            onToggleSubtask={handleToggleSubtask}
+                            onToggleMainTask={handleToggleMainTask}
+                            loading={toggling}
+                        />
                     </div>
                 </div>
 
