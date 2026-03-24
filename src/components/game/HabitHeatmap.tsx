@@ -103,10 +103,13 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
                     rectRender={(props, rectData) => (
                         <rect
                             {...props}
-                            fill={colorForCount(rectData.count || 0)}
+                            style={{
+                                ...(props.style || {}),
+                                fill: colorForCount(rectData.count || 0),
+                                cursor: "pointer",
+                            }}
                             data-tooltip-id="heatmap-tooltip"
                             data-tooltip-content={`${rectData.date || ""}: ${rectData.count ? (rectData.count * 10) + "% completion" : "No activity"}`}
-                            style={{ cursor: "pointer" }}
                             onClick={() => handleDayClick(rectData.date || "")}
                         />
                     )}
