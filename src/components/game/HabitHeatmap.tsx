@@ -29,6 +29,15 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         return { startDate: past, endDate: today };
     }, []);
 
+    const normalizeDateKey = (dateStr: string) => {
+        const parts = dateStr.split(/[\/-]/).map((p) => p.trim()).filter(Boolean);
+        if (parts.length !== 3) return dateStr;
+        const y = parts[0];
+        const m = String(parseInt(parts[1], 10)).padStart(2, "0");
+        const day = String(parseInt(parts[2], 10)).padStart(2, "0");
+        return `${y}/${m}/${day}`;
+    };
+
     const validData = (data || []).map(d => {
         const [y, m, day] = d.date.split('-');
         return {
@@ -38,9 +47,17 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
         };
     });
 
+    const countByDate = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const item of validData) {
+            map[normalizeDateKey(item.date)] = Math.max(0, Math.min(10, item.count || 0));
+        }
+        return map;
+    }, [validData]);
+
     const heatmapKey = useMemo(
-        () => validData.map((d) => `${d.date}:${d.count}`).join("|"),
-        [validData]
+        () => Object.entries(countByDate).sort(([a], [b]) => a.localeCompare(b)).map(([d, c]) => `${d}:${c}`).join("|"),
+        [countByDate]
     );
 
     const colorForCount = (count: number) => {
@@ -101,17 +118,23 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
                         10: "#00ff88",
                     }}
                     rectRender={(props, rectData) => (
-                        <rect
-                            {...props}
-                            style={{
-                                ...(props.style || {}),
-                                fill: colorForCount(rectData.count || 0),
-                                cursor: "pointer",
-                            }}
-                            data-tooltip-id="heatmap-tooltip"
-                            data-tooltip-content={`${rectData.date || ""}: ${rectData.count ? (rectData.count * 10) + "% completion" : "No activity"}`}
-                            onClick={() => handleDayClick(rectData.date || "")}
-                        />
+                        (() => {
+                            const dateKey = normalizeDateKey(rectData.date || "");
+                            const count = countByDate[dateKey] || 0;
+                            return (
+                                <rect
+                                    {...props}
+                                    style={{
+                                        ...(props.style || {}),
+                                        fill: colorForCount(count),
+                                        cursor: "pointer",
+                                    }}
+                                    data-tooltip-id="heatmap-tooltip"
+                                    data-tooltip-content={`${dateKey}: ${count ? (count * 10) + "% completion" : "No activity"}`}
+                                    onClick={() => handleDayClick(dateKey)}
+                                />
+                            );
+                        })()
                     )}
                 />
             </div>
