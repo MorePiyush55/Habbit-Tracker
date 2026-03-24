@@ -23,9 +23,8 @@ export default function HabitHeatmap({ data }: HabitHeatmapProps) {
 
     const { startDate, endDate } = useMemo(() => {
         const today = new Date();
-        const past = new Date();
-        past.setDate(today.getDate() - 120);
-        return { startDate: past, endDate: today };
+        const janFirst = new Date(today.getFullYear(), 0, 1);
+        return { startDate: janFirst, endDate: today };
     }, []);
 
     const normalizeDateKey = (dateStr: string) => {
