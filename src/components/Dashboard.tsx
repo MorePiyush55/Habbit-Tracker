@@ -17,12 +17,12 @@ import EmotionalFeedbackBanner from "@/components/game/EmotionalFeedbackBanner";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import HabitHeatmap from "@/components/game/HabitHeatmap";
 import AppNav from "@/components/AppNav";
-import { ListChecks, ChevronDown, Shield, AlertTriangle } from "lucide-react";
+import { ListChecks, Shield, AlertTriangle } from "lucide-react";
 import { getRankConfigs } from "@/lib/rankConfig";
 import { SYSTEM_RULES } from "@/config/systemRules";
 import { useComboRewards } from "@/components/game/hooks/useComboRewards";
 import { useProgressBoard } from "@/hooks/useProgressBoard";
-import { getTop3Tasks, scoreTask } from "@/lib/core/productLoop";
+import { scoreTask } from "@/lib/core/productLoop";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -32,7 +32,6 @@ export default function Dashboard() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
     const [showCelebration, setShowCelebration] = useState(false);
-    const [focusMode, setFocusMode] = useState(true);
     const [streakSecured, setStreakSecured] = useState(false);
     const [failFeedback, setFailFeedback] = useState(false);
     const [reviewActionLoading, setReviewActionLoading] = useState(false);
@@ -285,8 +284,7 @@ export default function Dashboard() {
         return [...quests].sort((a, b) => scoreTask(b as Quest) - scoreTask(a as Quest));
     }, [quests]);
 
-    const displayedQuests = focusMode ? getTop3Tasks(sortedQuests as Quest[]) : sortedQuests;
-    const hiddenCount = Math.max(0, sortedQuests.length - 3);
+    const displayedQuests = sortedQuests;
     const backlogCount = sortedQuests.filter((q) => q.isBacklog && !q.isFullyCompleted).length;
     const backlogQuests = sortedQuests.filter((q) => q.isBacklog);
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
@@ -362,11 +360,11 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {!focusMode && <AppNav />}
-            {!focusMode && <SystemEventBanner />}
+            <AppNav />
+            <SystemEventBanner />
             <div className="dashboard-grid">
                 {/* ── LEFT SIDEBAR ── */}
-                {!focusMode && <div className="sidebar-left">
+                <div className="sidebar-left">
                     <PlayerStats
                         name={user?.name || "Hunter"}
                         photo={(user as Record<string, unknown>)?.image as string || ""}
@@ -382,27 +380,23 @@ export default function Dashboard() {
                         disciplineScore={userStats.disciplineScore}
                         hunterRank={userStats.hunterRank}
                     />
-                </div>}
+                </div>
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="main-content">
-                    {!focusMode && (
-                        <>
-                            <BossBattle
-                                bossHP={userStats.weeklyBossHP}
-                                isDefeated={userStats.bossDefeatedThisWeek}
-                                currentStreak={userStats.currentStreak}
-                            />
+                    <BossBattle
+                        bossHP={userStats.weeklyBossHP}
+                        isDefeated={userStats.bossDefeatedThisWeek}
+                        currentStreak={userStats.currentStreak}
+                    />
 
-                            <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
-                                <HabitHeatmap data={statsData?.heatmapData || []} />
-                            </div>
+                    <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
+                        <HabitHeatmap data={statsData?.heatmapData || []} />
+                    </div>
 
-                            <SessionTimer />
-                        </>
-                    )}
+                    <SessionTimer />
 
-                    {!focusMode && <div style={{
+                    <div style={{
                         padding: "8px 16px", borderRadius: 8, marginBottom: 8,
                         background: streakSecured
                             ? "rgba(0,255,136,0.08)" : completedCount > 0
@@ -420,9 +414,9 @@ export default function Dashboard() {
                                 </span>
                               </>
                         }
-                    </div>}
+                    </div>
 
-                    {!focusMode && yesterdayReview && yesterdayReview.unresolvedCount > 0 && (
+                    {yesterdayReview && yesterdayReview.unresolvedCount > 0 && (
                         <div style={{
                             background: "rgba(255,204,0,0.08)",
                             border: "1px solid rgba(255,204,0,0.35)",
@@ -479,7 +473,7 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {!focusMode && failFeedback && (
+                    {failFeedback && (
                         <div style={{
                             background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.5)",
                             borderRadius: 12, padding: "16px 20px", marginBottom: 20, textAlign: "center",
@@ -520,14 +514,12 @@ export default function Dashboard() {
                         }}
                     />
 
-                    {!focusMode && (
-                        <EmotionalFeedbackBanner
-                            completedCount={completedCount}
-                            totalCount={quests.length}
-                            streakSecured={streakSecured}
-                            majorEvent={Boolean(comboToast) || Boolean(lastCompletedQuest)}
-                        />
-                    )}
+                    <EmotionalFeedbackBanner
+                        completedCount={completedCount}
+                        totalCount={quests.length}
+                        streakSecured={streakSecured}
+                        majorEvent={Boolean(comboToast) || Boolean(lastCompletedQuest)}
+                    />
 
                     <div className="glass-card" style={{ padding: "var(--space-lg)", marginBottom: "1rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -535,22 +527,18 @@ export default function Dashboard() {
                                 <ListChecks size={28} style={{ color: "var(--accent-blue)" }} />
                                 <div>
                                     <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: 1 }}>
-                                        {focusMode ? "EXTREME FOCUS" : "DAILY QUESTS"}
+                                        DAILY QUESTS
                                     </h1>
-                                    {!focusMode && (
-                                        <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "0.85rem" }}>
-                                            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                                        </p>
-                                    )}
+                                    <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "0.85rem" }}>
+                                        {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                                    </p>
                                 </div>
                             </div>
                             <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-                                {!focusMode && (
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-blue)" }}>{completedCount}/{quests.length}</div>
-                                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMPLETED</div>
-                                    </div>
-                                )}
+                                <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-blue)" }}>{completedCount}/{quests.length}</div>
+                                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMPLETED</div>
+                                </div>
                                 <div style={{ textAlign: "center" }}>
                                     <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-gold)" }}>+{totalXP}</div>
                                     <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>XP TODAY</div>
@@ -565,17 +553,15 @@ export default function Dashboard() {
                                         </div>
                                     )}
                                 </div>
-                                {!focusMode && combo >= 2 && (
+                                {combo >= 2 && (
                                     <div style={{ textAlign: "center" }}>
                                         <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#ff8c00" }}>🔥{combo}x</div>
                                         <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMBO</div>
                                     </div>
                                 )}
-                                {!focusMode && (
-                                    <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                                        + New
-                                    </button>
-                                )}
+                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                                    + New
+                                </button>
                             </div>
                         </div>
 
@@ -598,9 +584,9 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {!focusMode && <QuickAddTask onAdded={() => mutateProgress()} />}
+                        <QuickAddTask onAdded={() => mutateProgress()} />
 
-                        {!focusMode && backlogCount > 0 && (
+                        {backlogCount > 0 && (
                             <div style={{
                                 marginTop: "12px",
                                 marginBottom: "12px",
@@ -616,7 +602,7 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {!focusMode && backlogQuests.length > 0 && (
+                        {backlogQuests.length > 0 && (
                             <div className="glass-card" style={{ padding: "14px 18px", marginBottom: 12 }}>
                                 <div style={{ color: "#ff7a7a", fontWeight: 700, fontFamily: "monospace", fontSize: "0.85rem", marginBottom: 8 }}>
                                     BACKLOG MISSIONS
@@ -641,23 +627,6 @@ export default function Dashboard() {
                             onChangeRank={handleChangeRank}
                             loading={toggling}
                         />
-
-                        {sortedQuests.length > 3 && (
-                            <button
-                                onClick={() => setFocusMode(prev => !prev)}
-                                style={{
-                                    display: "flex", alignItems: "center", gap: 6,
-                                    width: "100%", padding: "10px", justifyContent: "center",
-                                    background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)",
-                                    borderRadius: 8, cursor: "pointer", color: "var(--text-muted)",
-                                    fontSize: "0.8rem", fontFamily: "monospace", letterSpacing: 1,
-                                    marginTop: 12,
-                                }}
-                            >
-                                <ChevronDown size={14} style={{ transform: focusMode ? "none" : "rotate(180deg)", transition: "transform 0.2s" }} />
-                                {focusMode ? `Show all ${sortedQuests.length} quests (+${hiddenCount} more)` : "Show Focus Mode (top 3)"}
-                            </button>
-                        )}
                     </div>
                 </div>
 
