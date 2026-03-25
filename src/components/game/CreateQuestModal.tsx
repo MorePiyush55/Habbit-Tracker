@@ -124,7 +124,7 @@ export default function CreateQuestModal({ isOpen, onClose, onQuestCreated }: Cr
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose} onKeyDown={e => e.key === 'Escape' && onClose()}>
             <div className="modal-content glass-card" role="document" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2 className="section-title" style={{ margin: 0 }}>CREATE DAILY TASK</h2>
+                    <h2 className="section-title" style={{ margin: 0 }}>NEW QUEST</h2>
                     <button className="icon-btn" onClick={onClose}><X size={20} /></button>
                 </div>
 

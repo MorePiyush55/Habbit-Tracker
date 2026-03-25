@@ -2,6 +2,7 @@ import { getUserId } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { handleError, unauthorized } from "@/lib/apiError";
+import { SYSTEM_RULES } from "@/config/systemRules";
 
 /** POST /api/user/add-xp
  * Awards combo XP with server-side validation.
@@ -35,8 +36,8 @@ export async function POST(req: Request) {
 
         // Apply XP Soft Cap
         let adjustedAmount = amount;
-        if (user.dailyXP >= 200) {
-            adjustedAmount = Math.ceil(amount * 0.5); // 50% reduction when over 200 XP
+        if (user.dailyXP >= SYSTEM_RULES.DAILY_XP_SOFT_CAP) {
+            adjustedAmount = Math.ceil(amount * SYSTEM_RULES.DAILY_XP_SOFT_CAP_MULTIPLIER);
         }
 
         // Server-side combo validation
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
             const lastTask = user.lastTaskCompletedAt ? new Date(user.lastTaskCompletedAt) : null;
             const gapMinutes = lastTask ? (clientTime.getTime() - lastTask.getTime()) / 60000 : 9999;
 
-            if (gapMinutes > 120) {
+            if (gapMinutes > SYSTEM_RULES.COMBO_WINDOW_MINUTES) {
                 return Response.json({ error: "Combo expired — gap too large" }, { status: 400 });
             }
 

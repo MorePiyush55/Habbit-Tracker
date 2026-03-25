@@ -12,9 +12,10 @@ import { calculateQuestCompletion, calculateRequiredXpForLevel, getHunterRankLet
 import BehaviorLog from "@/models/BehaviorLog";
 import { Difficulty } from "@/types";
 import { emit, createEvent, SystemEvents } from "@/lib/core/eventBus";
+import { SYSTEM_RULES } from "@/config/systemRules";
 
-export const DAILY_MINIMUM_REQUIRED = 3;
-export const LATE_WINDOW_HOURS = 8;
+export const DAILY_MINIMUM_REQUIRED = SYSTEM_RULES.DAILY_MIN_TASKS;
+export const LATE_WINDOW_HOURS = SYSTEM_RULES.LATE_WINDOW_HOURS;
 export const LATE_XP_MULTIPLIER = 0.7;
 export const BACKLOG_XP_MULTIPLIER = 0.7;
 export const RECOVERY_XP_MULTIPLIER = 0.5;

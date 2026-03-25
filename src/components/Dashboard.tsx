@@ -13,14 +13,18 @@ import CelebrationOverlay from "@/components/game/CelebrationOverlay";
 import QuickAddTask from "@/components/game/QuickAddTask";
 import SessionTimer from "@/components/game/SessionTimer";
 import NextBestAction from "@/components/game/NextBestAction";
+import EmotionalFeedbackBanner from "@/components/game/EmotionalFeedbackBanner";
 import SystemEventBanner from "@/components/system/SystemEventBanner";
 import HabitHeatmap from "@/components/game/HabitHeatmap";
 import AppNav from "@/components/AppNav";
 import { ListChecks, ChevronDown, Shield, AlertTriangle } from "lucide-react";
 import { getRankConfigs } from "@/lib/rankConfig";
+import { SYSTEM_RULES } from "@/config/systemRules";
+import { useComboRewards } from "@/components/game/hooks/useComboRewards";
+import { useProgressBoard } from "@/hooks/useProgressBoard";
+import { getTop3Tasks, scoreTask } from "@/lib/core/productLoop";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
-const DAILY_MINIMUM = 3;
 
 export default function Dashboard() {
     const { data: session } = useSession();
@@ -32,57 +36,54 @@ export default function Dashboard() {
     const [streakSecured, setStreakSecured] = useState(false);
     const [failFeedback, setFailFeedback] = useState(false);
     const [reviewActionLoading, setReviewActionLoading] = useState(false);
-    const [combo, setCombo] = useState(0);
-    const [lastTaskTime, setLastTaskTime] = useState<Date | null>(null);
-    const [comboToast, setComboToast] = useState<{ text: string; xp: number } | null>(null);
+    const [xpFloat, setXpFloat] = useState<number | null>(null);
 
     const todayDate = new Date();
     const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
     const celebrationShownRef = useRef(false);
+    const lastXpRef = useRef(0);
     const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingToggles = useRef(0);
 
-    const { data: progressData, isLoading: progressLoading, mutate: mutateProgress } = useSWR(
-        `/api/progress?date=${today}`,
-        fetcher,
-        { refreshInterval: 30000 }
-    );
+    // Use centralized progress board hook for data fetching
+    const { data: boardData, isLoading: progressLoading, mutate: mutateProgress } = useProgressBoard(today);
 
     const { data: statsData } = useSWR("/api/analytics?days=120", fetcher, { refreshInterval: 30000 });
 
-    const quests: Quest[] = progressData?.habits || [];
-    const yesterdayReview = progressData?.yesterdayReview || null;
+    const quests: Quest[] = boardData?.tasks || [];
+    const yesterdayReview = boardData?.yesterdayReview || null;
+    const statsObj = boardData?.stats || {
+        STR: { value: 10, xp: 0 }, VIT: { value: 10, xp: 0 }, INT: { value: 10, xp: 0 },
+        AGI: { value: 10, xp: 0 }, PER: { value: 10, xp: 0 }, CHA: { value: 10, xp: 0 }
+    } as const;
     const userStats = {
-        totalXP: statsData?.user?.totalXP || 0,
-        currentStreak: statsData?.user?.currentStreak || 0,
-        longestStreak: statsData?.user?.longestStreak || 0,
-        level: statsData?.user?.level || 1,
-        gold: statsData?.user?.gold || 0,
-        statPoints: statsData?.user?.statPoints || 0,
-        stats: statsData?.user?.stats || {
-            STR: { value: 10, xp: 0 }, VIT: { value: 10, xp: 0 }, INT: { value: 10, xp: 0 },
-            AGI: { value: 10, xp: 0 }, PER: { value: 10, xp: 0 }, CHA: { value: 10, xp: 0 }
-        },
-        disciplineScore: statsData?.user?.disciplineScore || 50,
-        focusScore: statsData?.user?.focusScore || 50,
-        skillGrowthScore: statsData?.user?.skillGrowthScore || 50,
-        hunterRank: statsData?.user?.hunterRank || "E-Class",
-        jobClass: statsData?.user?.jobClass || "F-Rank Recruit",
-        hp: statsData?.user?.hp ?? 100,
-        maxHp: statsData?.user?.maxHp ?? 100,
-        weeklyBossHP: statsData?.user?.weeklyBossHP || 500,
-        bossDefeatedThisWeek: statsData?.user?.bossDefeatedThisWeek || false,
+        totalXP: boardData?.xp || 0,
+        currentStreak: boardData?.streak || 0,
+        longestStreak: boardData?.longestStreak || 0,
+        level: boardData?.level || 1,
+        gold: boardData?.gold || 0,
+        statPoints: boardData?.statPoints || 0,
+        stats: statsObj as { STR: { value: number; xp: number }; VIT: { value: number; xp: number }; INT: { value: number; xp: number }; AGI: { value: number; xp: number }; PER: { value: number; xp: number }; CHA: { value: number; xp: number } },
+        disciplineScore: boardData?.disciplineScore ?? 50,
+        focusScore: boardData?.focusScore ?? 50,
+        skillGrowthScore: boardData?.skillGrowthScore ?? 50,
+        hunterRank: boardData?.hunterRank || "E-Class",
+        jobClass: boardData?.jobClass || "F-Rank Recruit",
+        hp: boardData?.hp ?? 100,
+        maxHp: boardData?.maxHp ?? 100,
+        weeklyBossHP: boardData?.bossHP || 500,
+        bossDefeatedThisWeek: boardData?.bossDefeatedThisWeek || false,
     };
     const loading = progressLoading;
 
     useEffect(() => {
-        if (progressData?.streakSecuredDate === today) {
+        if (boardData?.streakSecuredDate === today) {
             setStreakSecured(true);
         }
-        if (progressData?.failFeedback) {
+        if (boardData?.failFeedback) {
             setFailFeedback(true);
         }
-    }, [progressData, today]);
+    }, [boardData, today]);
 
     // Emit SESSION_START once on mount via ref (not in useEffect)
     const sessionStartRef = useRef(false);
@@ -97,10 +98,20 @@ export default function Dashboard() {
         }
     }
 
-    const showComboToast = useCallback((text: string, xp: number) => {
-        setComboToast({ text, xp });
-        setTimeout(() => setComboToast(null), 2500);
-    }, []);
+    const { combo, comboToast, registerCompletion } = useComboRewards({
+        onAwardXP: (bonusXP, comboCount, timestamp) => {
+            fetch("/api/user/add-xp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    amount: bonusXP,
+                    comboCount,
+                    timestamp: timestamp.toISOString(),
+                    reason: "combo",
+                }),
+            }).catch(() => {});
+        },
+    });
 
     const scheduleSync = useCallback(() => {
         if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -114,35 +125,8 @@ export default function Dashboard() {
     const handleTaskCompleted = useCallback(async (isCompleted: boolean, totalQuestCount: number) => {
         if (!isCompleted) return;
 
-        const taskNow = new Date();
-        const gapMinutes = lastTaskTime ? (taskNow.getTime() - lastTaskTime.getTime()) / 60000 : 999;
-        const newCombo = gapMinutes <= 120 ? combo + 1 : 1;
-
-        setCombo(newCombo);
-        setLastTaskTime(taskNow);
-
-        let bonusXP = 0;
-        let toastText = "";
-        if (newCombo === 3) {
-            bonusXP = 20;
-            toastText = "3x COMBO!";
-        } else if (newCombo === 5) {
-            bonusXP = 50;
-            toastText = "5x COMBO!";
-        } else if (newCombo === totalQuestCount && totalQuestCount > 0) {
-            bonusXP = 100;
-            toastText = "PERFECT COMBO!";
-        }
-
-        if (bonusXP > 0) {
-            showComboToast(toastText, bonusXP);
-            fetch("/api/user/add-xp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: bonusXP, comboCount: newCombo, timestamp: taskNow.toISOString(), reason: "combo" }),
-            }).catch(() => {});
-        }
-    }, [combo, lastTaskTime, showComboToast]);
+        registerCompletion(totalQuestCount);
+    }, [registerCompletion]);
 
     const handleToggleSubtask = async (habitId: string, subtaskId: string, completed: boolean) => {
         if (!completed) {
@@ -298,31 +282,22 @@ export default function Dashboard() {
     };
 
     const sortedQuests = useMemo(() => {
-        const pOrder: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-
-        return [...quests].sort((a, b) => {
-            if (Boolean(a.isBacklog) !== Boolean(b.isBacklog)) {
-                return a.isBacklog ? -1 : 1;
-            }
-            if (a.isFullyCompleted !== b.isFullyCompleted) {
-                return a.isFullyCompleted ? 1 : -1;
-            }
-            const aPri = pOrder[(a as any).priority] ?? 1;
-            const bPri = pOrder[(b as any).priority] ?? 1;
-            if (aPri !== bPri) return aPri - bPri;
-            return (b.xpReward || 0) - (a.xpReward || 0);
-        });
+        return [...quests].sort((a, b) => scoreTask(b as Quest) - scoreTask(a as Quest));
     }, [quests]);
 
-    const displayedQuests = focusMode ? sortedQuests.slice(0, 3) : sortedQuests;
+    const displayedQuests = focusMode ? getTop3Tasks(sortedQuests as Quest[]) : sortedQuests;
     const hiddenCount = Math.max(0, sortedQuests.length - 3);
     const backlogCount = sortedQuests.filter((q) => q.isBacklog && !q.isFullyCompleted).length;
     const backlogQuests = sortedQuests.filter((q) => q.isBacklog);
     const completedCount = quests.filter((q) => q.isFullyCompleted).length;
     const totalXP = quests.reduce((sum, q) => sum + (q.isFullyCompleted ? q.xpReward : 0), 0);
+    const lastCompletedQuest = useMemo(() => {
+        const done = quests.filter((q) => q.isFullyCompleted);
+        return done.length > 0 ? done[done.length - 1]._id : "";
+    }, [quests]);
 
     useEffect(() => {
-        if (!streakSecured && completedCount >= DAILY_MINIMUM && quests.length > 0 && !loading) {
+        if (!streakSecured && completedCount >= SYSTEM_RULES.DAILY_MIN_TASKS && quests.length > 0 && !loading) {
             setStreakSecured(true);
             fetch("/api/progress", {
                 method: "POST",
@@ -339,6 +314,23 @@ export default function Dashboard() {
         }
         if (completedCount < quests.length) celebrationShownRef.current = false;
     }, [completedCount, quests.length, loading]);
+
+    useEffect(() => {
+        if (totalXP > lastXpRef.current) {
+            const gain = totalXP - lastXpRef.current;
+            
+            // Delay XP pop by 150ms to increase perceived reward impact
+            const delayTimer = setTimeout(() => {
+                setXpFloat(gain);
+                const fadeTimer = setTimeout(() => setXpFloat(null), 1400);
+                return () => clearTimeout(fadeTimer);
+            }, 150);
+            
+            lastXpRef.current = totalXP;
+            return () => clearTimeout(delayTimer);
+        }
+        lastXpRef.current = totalXP;
+    }, [totalXP]);
 
     const user = session?.user;
 
@@ -370,11 +362,11 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <AppNav />
-            <SystemEventBanner />
+            {!focusMode && <AppNav />}
+            {!focusMode && <SystemEventBanner />}
             <div className="dashboard-grid">
                 {/* ── LEFT SIDEBAR ── */}
-                <div className="sidebar-left">
+                {!focusMode && <div className="sidebar-left">
                     <PlayerStats
                         name={user?.name || "Hunter"}
                         photo={(user as Record<string, unknown>)?.image as string || ""}
@@ -390,25 +382,27 @@ export default function Dashboard() {
                         disciplineScore={userStats.disciplineScore}
                         hunterRank={userStats.hunterRank}
                     />
-                </div>
+                </div>}
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="main-content">
-                    {/* 1. Weekly Boss Raid — TOP */}
-                    <BossBattle
-                        bossHP={userStats.weeklyBossHP}
-                        isDefeated={userStats.bossDefeatedThisWeek}
-                        currentStreak={userStats.currentStreak}
-                    />
+                    {!focusMode && (
+                        <>
+                            <BossBattle
+                                bossHP={userStats.weeklyBossHP}
+                                isDefeated={userStats.bossDefeatedThisWeek}
+                                currentStreak={userStats.currentStreak}
+                            />
 
-                    {/* Phase 4: Habit Heatmap */}
-                    <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
-                        <HabitHeatmap data={statsData?.heatmapData || []} />
-                    </div>
+                            <div style={{ marginBottom: "1rem", marginTop: "1rem" }}>
+                                <HabitHeatmap data={statsData?.heatmapData || []} />
+                            </div>
 
-                    <SessionTimer />
+                            <SessionTimer />
+                        </>
+                    )}
 
-                    <div style={{
+                    {!focusMode && <div style={{
                         padding: "8px 16px", borderRadius: 8, marginBottom: 8,
                         background: streakSecured
                             ? "rgba(0,255,136,0.08)" : completedCount > 0
@@ -420,15 +414,15 @@ export default function Dashboard() {
                             ? <><Shield size={14} style={{ color: "#00ff88" }} /><span style={{ color: "#00ff88" }}>Streak secured for today! ({completedCount}/{quests.length} done)</span></>
                             : <><AlertTriangle size={14} style={{ color: completedCount > 0 ? "#ffcc00" : "#ff4466" }} />
                                 <span style={{ color: completedCount > 0 ? "#ffcc00" : "#ff4466" }}>
-                                    {DAILY_MINIMUM - completedCount > 0
-                                        ? `${DAILY_MINIMUM - completedCount} more task${DAILY_MINIMUM - completedCount > 1 ? "s" : ""} to protect streak (${completedCount}/${DAILY_MINIMUM} min)`
+                                    {SYSTEM_RULES.DAILY_MIN_TASKS - completedCount > 0
+                                        ? `${SYSTEM_RULES.DAILY_MIN_TASKS - completedCount} more task${SYSTEM_RULES.DAILY_MIN_TASKS - completedCount > 1 ? "s" : ""} to protect streak (${completedCount}/${SYSTEM_RULES.DAILY_MIN_TASKS} min)`
                                         : "Complete tasks to protect your streak!"}
                                 </span>
                               </>
                         }
-                    </div>
+                    </div>}
 
-                    {yesterdayReview && yesterdayReview.unresolvedCount > 0 && (
+                    {!focusMode && yesterdayReview && yesterdayReview.unresolvedCount > 0 && (
                         <div style={{
                             background: "rgba(255,204,0,0.08)",
                             border: "1px solid rgba(255,204,0,0.35)",
@@ -474,18 +468,18 @@ export default function Dashboard() {
                                         opacity: reviewActionLoading ? 0.6 : 1,
                                     }}
                                 >
-                                    Carry Forward as Backlog
+                                    Carry Forward
                                 </button>
                             </div>
                             {!yesterdayReview.canLateFix && (
                                 <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: "0.75rem", fontFamily: "monospace" }}>
-                                    Late fix window expired. Use backlog recovery before today ends.
+                                    Late window closed. Use backlog recovery today.
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {failFeedback && (
+                    {!focusMode && failFeedback && (
                         <div style={{
                             background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.5)",
                             borderRadius: 12, padding: "16px 20px", marginBottom: 20, textAlign: "center",
@@ -495,8 +489,8 @@ export default function Dashboard() {
                                 SYSTEM WARNING
                             </div>
                             <div style={{ color: "var(--text-primary)", fontSize: "0.9rem" }}>
-                                You failed to meet the daily minimum requirements yesterday.<br />
-                                <span style={{ color: "#ff4466", fontWeight: 600 }}>Your streak has been reset to 0.</span>
+                                Daily minimum missed yesterday.<br />
+                                <span style={{ color: "#ff4466", fontWeight: 600 }}>Streak reset to 0.</span>
                             </div>
                             <button
                                 onClick={() => setFailFeedback(false)}
@@ -511,14 +505,29 @@ export default function Dashboard() {
                     )}
 
                     <NextBestAction
-                        quest={sortedQuests.find(q => !q.isFullyCompleted) || null}
+                        quests={sortedQuests as Quest[]}
                         onComplete={(id) => {
                             const quest = sortedQuests.find(q => q._id === id || q.subtasks?.some(s => s._id === id));
                             if (!quest) return;
                             if (quest._id === id) handleToggleMainTask(id, true);
                             else handleToggleSubtask(quest._id, id, true);
                         }}
+                        onScrollToTask={(taskId) => {
+                            const target = document.querySelector(`[data-quest-id="${taskId}"]`);
+                            if (target instanceof HTMLElement) {
+                                target.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }
+                        }}
                     />
+
+                    {!focusMode && (
+                        <EmotionalFeedbackBanner
+                            completedCount={completedCount}
+                            totalCount={quests.length}
+                            streakSecured={streakSecured}
+                            majorEvent={Boolean(comboToast) || Boolean(lastCompletedQuest)}
+                        />
+                    )}
 
                     <div className="glass-card" style={{ padding: "var(--space-lg)", marginBottom: "1rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -526,35 +535,58 @@ export default function Dashboard() {
                                 <ListChecks size={28} style={{ color: "var(--accent-blue)" }} />
                                 <div>
                                     <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: 1 }}>
-                                        {focusMode ? "TODAY'S FOCUS" : "DAILY QUESTS"}
+                                        {focusMode ? "EXTREME FOCUS" : "DAILY QUESTS"}
                                     </h1>
-                                    <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "0.85rem" }}>
-                                        {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                                    </p>
+                                    {!focusMode && (
+                                        <p style={{ color: "var(--text-muted)", margin: 0, fontSize: "0.85rem" }}>
+                                            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-                                <div style={{ textAlign: "center" }}>
-                                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-blue)" }}>{completedCount}/{quests.length}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMPLETED</div>
-                                </div>
+                                {!focusMode && (
+                                    <div style={{ textAlign: "center" }}>
+                                        <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-blue)" }}>{completedCount}/{quests.length}</div>
+                                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMPLETED</div>
+                                    </div>
+                                )}
                                 <div style={{ textAlign: "center" }}>
                                     <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent-gold)" }}>+{totalXP}</div>
                                     <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>XP TODAY</div>
+                                    {xpFloat !== null && (
+                                        <div style={{
+                                            color: "#00ff88",
+                                            fontSize: "0.78rem",
+                                            fontWeight: 800,
+                                            animation: "xpFloatUp 1.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                                        }}>
+                                            +{xpFloat} XP
+                                        </div>
+                                    )}
                                 </div>
-                                {combo >= 2 && (
+                                {!focusMode && combo >= 2 && (
                                     <div style={{ textAlign: "center" }}>
                                         <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#ff8c00" }}>🔥{combo}x</div>
                                         <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: 1 }}>COMBO</div>
                                     </div>
                                 )}
-                                <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-                                    + Add Quest
-                                </button>
+                                {!focusMode && (
+                                    <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+                                        + New
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        <div className="glass-card" style={{ padding: "16px 24px", marginTop: "14px", marginBottom: "14px" }}>
+                        <div className="glass-card" style={{
+                            padding: "16px 24px",
+                            marginTop: "14px",
+                            marginBottom: "14px",
+                            boxShadow: combo >= 2 ? "0 0 32px rgba(255,140,0,0.35), 0 0 60px rgba(255,140,0,0.18) inset" : undefined,
+                            border: combo >= 2 ? "1px solid rgba(255,140,0,0.35)" : undefined,
+                            animation: combo >= 2 ? "comboPulse 1.5s ease-in-out infinite" : undefined,
+                        }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                                 <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", letterSpacing: 1 }}>DAILY COMPLETION</span>
                                 <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent-blue)" }}>
@@ -566,9 +598,9 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <QuickAddTask onAdded={() => mutateProgress()} />
+                        {!focusMode && <QuickAddTask onAdded={() => mutateProgress()} />}
 
-                        {backlogCount > 0 && (
+                        {!focusMode && backlogCount > 0 && (
                             <div style={{
                                 marginTop: "12px",
                                 marginBottom: "12px",
@@ -584,7 +616,7 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {backlogQuests.length > 0 && (
+                        {!focusMode && backlogQuests.length > 0 && (
                             <div className="glass-card" style={{ padding: "14px 18px", marginBottom: 12 }}>
                                 <div style={{ color: "#ff7a7a", fontWeight: 700, fontFamily: "monospace", fontSize: "0.85rem", marginBottom: 8 }}>
                                     BACKLOG MISSIONS
@@ -641,6 +673,17 @@ export default function Dashboard() {
                 @keyframes fadeInDown {
                     from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
                     to { opacity: 1; transform: translateX(-50%) translateY(0); }
+                }
+
+                @keyframes xpFloatUp {
+                    0% { opacity: 0; transform: translateY(10px) scale(0.95); }
+                    20% { opacity: 1; transform: translateY(2px) scale(1); }
+                    100% { opacity: 0; transform: translateY(-14px) scale(1.02); }
+                }
+
+                @keyframes comboPulse {
+                    0%, 100% { box-shadow: 0 0 24px rgba(255,140,0,0.22), 0 0 30px rgba(255,140,0,0.14) inset; }
+                    50% { box-shadow: 0 0 38px rgba(255,140,0,0.45), 0 0 72px rgba(255,140,0,0.22) inset; }
                 }
             `}</style>
         </div>

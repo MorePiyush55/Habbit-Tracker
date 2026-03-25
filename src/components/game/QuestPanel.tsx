@@ -207,12 +207,14 @@ export default function QuestPanel({ quests, date, onToggleSubtask, onDeleteQues
                     return (
                         <div
                             key={quest._id}
+                            data-quest-id={quest._id}
                             className={`quest-item glass-card ${quest.isFullyCompleted ? "completed" : ""}`}
                             style={{
                                 animationDelay: `${index * 0.05}s`,
                                 borderLeft: `3px solid ${rankStyle.border}`,
                                 opacity: quest.isFullyCompleted ? 0.65 : 1,
-                                transition: "opacity 0.3s",
+                                transform: quest.isFullyCompleted ? "scale(0.985)" : "scale(1)",
+                                transition: "opacity 0.28s ease, transform 0.28s ease",
                             }}
                         >
                             <div

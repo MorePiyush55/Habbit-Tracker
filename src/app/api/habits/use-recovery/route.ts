@@ -2,6 +2,7 @@ import { getUserId } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { handleError, unauthorized } from "@/lib/apiError";
+import { SYSTEM_RULES } from "@/config/systemRules";
 
 function getISOWeekKey(date: Date): string {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -56,8 +57,8 @@ export async function POST() {
         }
 
         const daysSinceUse = daysBetween(token.lastUsedDate, now);
-        if (daysSinceUse < 3) {
-            const daysLeft = 3 - daysSinceUse;
+        if (daysSinceUse < SYSTEM_RULES.RECOVERY_COOLDOWN_DAYS) {
+            const daysLeft = SYSTEM_RULES.RECOVERY_COOLDOWN_DAYS - daysSinceUse;
             return Response.json({ error: `Cooldown active — ${daysLeft} day(s) remaining` }, { status: 400 });
         }
 
@@ -113,8 +114,8 @@ export async function GET() {
         // Check if refill needed
         const effectiveCount = token.weekRefillKey !== currentWeekKey ? 1 : token.count;
         const daysSinceUse = daysBetween(token.lastUsedDate ? new Date(token.lastUsedDate) : null, now);
-        const cooldownActive = daysSinceUse < 3;
-        const cooldownDaysLeft = cooldownActive ? 3 - daysSinceUse : 0;
+        const cooldownActive = daysSinceUse < SYSTEM_RULES.RECOVERY_COOLDOWN_DAYS;
+        const cooldownDaysLeft = cooldownActive ? SYSTEM_RULES.RECOVERY_COOLDOWN_DAYS - daysSinceUse : 0;
         const yesterdayMissed = (user as any).lastCompletedDate !== yesterday && (user as any).streakSecuredDate !== yesterday;
 
         return Response.json({

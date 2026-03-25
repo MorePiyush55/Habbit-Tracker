@@ -2,14 +2,21 @@
 
 import { Target, CheckCircle2, ArrowRight } from "lucide-react";
 import type { Quest } from "./QuestPanel";
+import { getTop3Tasks } from "@/lib/core/productLoop";
 
 interface Props {
-    quest: Quest | null;
+    quests?: Quest[];
+    quest?: Quest | null;
     onComplete: (habitId: string) => void;
+    onScrollToTask?: (habitId: string) => void;
 }
 
-export default function NextBestAction({ quest, onComplete }: Props) {
-    if (!quest) return null;
+export default function NextBestAction({ quests = [], quest, onComplete, onScrollToTask }: Props) {
+    // Use Focus Mode to find best next action
+    const topTasks = quests && quests.length > 0 ? getTop3Tasks(quests) : [];
+    const nextTask = topTasks[0] || quest || null;
+
+    if (!nextTask) return null;
 
     return (
         <div style={{
@@ -41,28 +48,35 @@ export default function NextBestAction({ quest, onComplete }: Props) {
                     </div>
                     
                     <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
-                        {quest.title}
+                        {nextTask.title}
                     </div>
                     
                     <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.8rem", fontFamily: "monospace" }}>
-                        <span style={{ color: "#ffcc00", fontWeight: 700 }}>+{quest.xpReward} XP</span>
+                        <span style={{ color: "#ffcc00", fontWeight: 700 }}>+{nextTask.xpReward} XP</span>
                         {/* If it's a long task with subtasks, show subtask count */}
-                        {quest.subtasks && quest.subtasks.length > 0 && (
-                            <span style={{ color: "var(--text-muted)" }}>• {quest.subtasks.length} steps</span>
+                        {nextTask.subtasks && nextTask.subtasks.length > 0 && (
+                            <span style={{ color: "var(--text-muted)" }}>• {nextTask.subtasks.length} steps</span>
                         )}
-                        <span style={{ color: "var(--text-muted)", opacity: 0.5 }}>• {quest.category}</span>
+                        <span style={{ color: "var(--text-muted)", opacity: 0.5 }}>• {nextTask.category}</span>
                     </div>
                 </div>
 
                 <button
                     onClick={() => {
-                        // Find the first incomplete subtask, or complete the main task
-                        if (quest.subtasks && quest.subtasks.length > 0) {
-                            const nextSub = quest.subtasks.find(s => !s.completed);
-                            if (nextSub) onComplete(nextSub._id);
-                            else onComplete(quest._id);
+                        onScrollToTask?.(nextTask._id);
+
+                        // Instant completion path for simple tasks (no subtasks)
+                        if (!nextTask.subtasks || nextTask.subtasks.length === 0) {
+                            onComplete(nextTask._id);
+                            return;
+                        }
+
+                        // Complex task path: complete next incomplete subtask
+                        const nextSub = nextTask.subtasks.find(s => !s.completed);
+                        if (nextSub) {
+                            onComplete(nextSub._id);
                         } else {
-                            onComplete(quest._id);
+                            onComplete(nextTask._id);
                         }
                     }}
                     style={{
@@ -81,7 +95,7 @@ export default function NextBestAction({ quest, onComplete }: Props) {
                         e.currentTarget.style.boxShadow = "none";
                     }}
                 >
-                    <CheckCircle2 size={16} /> DO IT
+                    <CheckCircle2 size={16} /> DO IT NOW
                 </button>
             </div>
         </div>
